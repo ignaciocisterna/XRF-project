@@ -44,63 +44,67 @@ def snip_trace_safe(
     background = np.exp(y_final) - c
     return np.clip(background, 0, None)
 
-def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.1, height_factor=0.1, permitir_solapamientos=False):
+def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.06, sigma_umbral=5, permitir_solapamientos=False):
     """
-    Autodetección de elementos con opción de permitir o bloquear solapamientos con manuales.
+    Autodetección robusta basada en significancia estadística y probabilidad.
     """
     I_net = I - bkg_snip
-    umbral = np.max(I_net) * height_factor
-
-    indices, _ = find_peaks(I_net, height=umbral, distance=5)
+    # Calculamos la desviación estándar del ruido basada en el fondo (Poisson)
+    # Un pico es real si supera el fondo en N sigmas.
+    std_ruido = np.sqrt(np.maximum(bkg_snip, 1))
+    
+    # Buscamos picos que destaquen sobre el ruido local
+    indices, props = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=10)
     energias_picos = E[indices]
+    alturas_picos = I_net[indices]
 
-    zona_exclusion = (16.8, E.max())
-    elementos_finales = set()
+    elementos_finales = set(manual_elements) if manual_elements else set()
+    
+    # Lista de elementos comunes (Z del 11 al 40: Na a Zr, y metales pesados usuales)
+    # Esto evita que el solver elija Actinio (Ac) o Radio (Ra) por error.
+    Z_COMUNES = list(range(11, 41)) + [42, 47, 48, 50, 56, 74, 79, 80, 82] 
+    
+    zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
-    # 1. Inclusión de elementos manuales
-    manuales = manual_elements if manual_elements else []
-    elementos_finales.update(manuales)
-
-    # Pre-calculo de energías de manuales para control de solapamiento
-    energias_manuales = []
-    for m in manuales:
-        try:
-            z_m = xl.SymbolToAtomicNumber(m)
-            energias_manuales.append(xl.LineEnergy(z_m, xl.KA1_LINE))
-            energias_manuales.append(xl.LineEnergy(z_m, xl.LA1_LINE))
-        except: continue
-
-    # 2. Procesar picos detectados
-    for ep in energias_picos:
-        if zona_exclusion[0] < ep < zona_exclusion[1] or ep < 1.0:
+    for ep, ap in zip(energias_picos, alturas_picos):
+        # Filtros básicos de energía
+        if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0:
             continue
 
-        # Si NO se permite solapamientos y el pico ya está cerca de un manual se omite
-        if not permitir_solapamientos:
-            if any(abs(ep - em) < tolerance for em in energias_manuales if em > 0):
-                continue
-
-        candidato = None
+        mejor_candidato = None
         min_diff = tolerance
+        es_comun = False
 
+        # Buscamos en la tabla periódica (Z=11 al 92)
         for z in range(11, 93):
             symbol = xl.AtomicNumberToSymbol(z)
-            # Si el símbolo ya está (manual), no se busca de nuevo
+            
+            # Si ya está en manuales, saltar si no permitimos solapamiento
             if symbol in elementos_finales and not permitir_solapamientos:
                 continue
 
             try:
+                # Priorizamos líneas K para Z bajo y L para Z alto
                 e_k = xl.LineEnergy(z, xl.KA1_LINE)
                 e_l = xl.LineEnergy(z, xl.LA1_LINE)
-
+                
                 for e_theo in [e_k, e_l]:
-                    if abs(e_theo - ep) < min_diff:
-                        candidato = symbol
-                        min_diff = abs(e_theo - ep)
+                    diff = abs(e_theo - ep)
+                    if diff < min_diff:
+                        # Lógica de desempate:
+                        # Si el nuevo candidato es "común" y el anterior no, lo preferimos
+                        # aunque la diferencia de energía sea un poco mayor.
+                        nuevo_es_comun = z in Z_COMUNES
+                        
+                        if mejor_candidato is None or (nuevo_es_comun and not es_comun) or (diff < min_diff * 0.8):
+                            mejor_candidato = symbol
+                            min_diff = diff
+                            es_comun = nuevo_es_comun
+                            
             except: continue
 
-        if candidato:
-            elementos_finales.add(candidato)
+        if mejor_candidato:
+            elementos_finales.add(mejor_candidato)
 
     return sorted(list(elementos_finales))
 
@@ -142,4 +146,5 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     # 6. Aplicar máscara final al espectro completo
     mask = (E >= e_min_detectado) & (E <= e_max)
     
+
     return E[mask], I[mask]
