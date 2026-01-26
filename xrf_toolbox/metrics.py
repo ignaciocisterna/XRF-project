@@ -4,6 +4,7 @@ import xraylib as xl
 from scipy.signal import find_peaks
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
+from . import core
 
 def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     """
@@ -23,7 +24,7 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     for symb in elementos_detectados:
         try:
             # Obtenemos todas las líneas disponibles
-            info_lineas = metrics.get_Xray_info(symb, families=("K", "L", "M"))
+            info_lineas = core.get_Xray_info(symb, families=("K", "L", "M"))
 
             # Diccionario temporal para encontrar la mejor línea por familia
             # Estructura: {'K': {'e': energy, 'ratio': max_ratio, 'name': 'Ka1'}, ...}
@@ -92,13 +93,8 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
-    if fondo == "lin":
-        final_params = pack_params_lineal(p_to_use, elementos)
-    elif fondo == "cuad":
-        final_params = pack_params_cuad(p_to_use, elementos) 
-    else:
-        raise ValueError(f'{fondo} es una opción de fondo inválida, por favor elegir "lin" o "cuad"')
-
+    final_params = core.pack_params(p_to_use, elementos, fondo=fondo)
+    
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, I_fit, label='Modelo Ajustado', color='red', lw=1.5, alpha=0.8)
@@ -112,7 +108,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         elem_data = final_params["elements"][elem]
         try:
             # Reutilizamos la función del paquete para obtener energías
-            info = get_Xray_info(elem, families=tuple(shells))
+            info = core.get_Xray_info(elem, families=tuple(shells))
         except:
             continue
 
@@ -139,7 +135,10 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                                 })
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
-    area_ray, area_com = final_params.get("scat_areas", (0, 0))
+    scat = final_params.get("scat", {})
+    area_ray = scat.get("area_ray", 0)
+    area_com = scat.get("area_com", 0)
+
     if area_ray > umbral_area_familia:
         etiquetas_info.append({'e': 17.44, 'name': "Rayleigh\npeak"})
     if area_com > umbral_area_familia:
@@ -370,7 +369,7 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
             axes[i].fill_between(E[mask], diff, color='blue', alpha=0.15, label='Residuo')
             
             # Emisión característica
-            info = get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'])
             for line_name, line_data in info.items():
                 y_text = I[mask].max() * line_data['ratio']
                 if line_data['energy'] > res['range'][0] and line_data['energy'] < res['range'][1]:
@@ -414,7 +413,7 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
             axes[i].grid(True, alpha=0.2)
             
             # Emisión característica
-            info = get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'])
             for line_name, line_data in info.items():
                 y_text = I[mask].max() * line_data['ratio']
                 if line_data['energy'] > res['range'][0] and line_data['energy'] < res['range'][1]:
@@ -488,7 +487,7 @@ def exportar_reporte_pdf(E, I, I_fit, popt, elementos, nombre_muestra="Muestra",
             axes[i].plot(E[m], I_fit[m], 'r-', lw=1.2)
             axes[i].fill_between(E[m], I[m]-I_fit[m], color='blue', alpha=0.1)
             # Emisión característica
-            info = get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'])
             for line_name, line_data in info.items():
                 ymin, ymax = axes[i].get_ylim()
                 npoint = 0.9 * (ymin + ymax)  
