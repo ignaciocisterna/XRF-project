@@ -4,6 +4,9 @@ import pandas as pd
 from scipy.optimize import curve_fit
 import xraylib as xl
 import matplotlib.pyplot as plt
+import time
+import itertools
+import threading
 
 # Importaciones relativas 
 from . import core as core
@@ -137,7 +140,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -155,33 +158,41 @@ class XRFDeconv:
         upper_bounds = [np.inf] * len(p0_free)
         bounds = (lower_bounds, upper_bounds)
 
+        roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
+
         try:
             if etapa in ["K", "L"]:
                 popt, pcov = curve_fit(frx_wrapper, 
-                                      self.E, 
-                                      self.I, 
+                                      self.E[roi_mask], 
+                                      self.I[roi_mask], 
                                       p0=p0_free,
                                       bounds=bounds,
                                       method='trf',
                                       x_scale='jac',
-                                      loss='soft_l1'
+                                      loss='soft_l1',
+                                      xtol=tol, 
+                                      ftol=tol
                                       )
             elif etapa == "M":
                 popt, pcov = curve_fit(frx_wrapper, 
-                                      self.E, 
-                                      self.I,
+                                      self.E[roi_mask], 
+                                      self.I[roi_mask],
                                       p0=p0_free,
-                                      bounds=bounds
+                                      bounds=bounds,
+                                      xtol=tol, 
+                                      ftol=tol
                                       )
             else: #global
                 popt, pcov = curve_fit(frx_wrapper,
-                                      self.E,
-                                      self.I,
+                                      self.E[roi_mask],
+                                      self.I[roi_mask],
                                       p0=p0_free,
                                       bounds=bounds,
                                       sigma=np.sqrt(np.maximum(self.I, 1)),
                                       absolute_sigma=True,
-                                      max_nfev=50000 # Un ajuste global requiere más iteraciones
+                                      max_nfev=50000,
+                                      xtol=tol, 
+                                      ftol=tol 
                                   )
                 self.pcov = pcov 
 
@@ -189,21 +200,46 @@ class XRFDeconv:
             self.I_fit = frx_wrapper(self.E, *popt) 
 
             if graf:
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, popt, self.p_actual, [etapa])
+                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                                    popt, self.p_actual, [etapa])
 
         except Exception as e:
             print(f"Error al ajustar {etapa}: {e}")
 
 #------------------------------------------------------------------------------#
 
-    def run_full_fit(self, graf=False):
+    def animacion_carga(stop_event, mensaje):
+        for puntos in itertools.cycle([".", "..", "..."]):
+            if stop_event.is_set():
+                break
+            print(f"\r{mensaje}{puntos}   ", end="", flush=True)
+            time.sleep(0.5)
+        print("\r", end="", flush=True)
+
+#------------------------------------------------------------------------------#
+
+    def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-5):
         """Ejecuta el pipeline completo de ajuste secuencial."""
         for etapa in ["K", "L", "M"]:
-            print(f"  > Ajustando Capas {etapa}...")
-            self.run_stage_fit(etapa, graf=graf)
+            stop_event = threading.Event()
+            t = threading.Thread(
+                target=animacion_carga,
+                args=(stop_event, f"  > Ajustando Capas {etapa}")
+            )
+            t.start()
+            self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol)
+            stop_event.set()
+            t.join()
         
-        print("  > Refinando Ajuste Global...")
-        self.run_stage_fit('global', graf=graf)
+        stop_event = threading.Event()
+        t = threading.Thread(
+            target=animacion_carga,
+            args=(stop_event, "  > Refinando Ajuste Global")
+        )
+        t.start()
+        self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol)
+        stop_event.set()
+        t.join()
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
 
 #------------------------------------------------------------------------------#
@@ -224,5 +260,6 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
