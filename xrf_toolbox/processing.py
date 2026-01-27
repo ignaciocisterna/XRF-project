@@ -56,7 +56,6 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
     # Buscamos picos que destaquen sobre el ruido local
     indices, props = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=15, prominence=sigma_umbral*2)
     energias_picos = E[indices]
-    alturas_picos = I_net[indices]
 
     elementos_finales = set(manual_elements) if manual_elements else set()
 
@@ -67,40 +66,51 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
     else:
         EXCLUIR = {}
     
-    # Elementos con alta probabilidad (Metales de transición y geológicos comunes)
-    PRIORIDAD = {'Fe', 'Cu', 'Zn', 'Pb', 'As', 'Sr', 'Ti', 'Cr', 'Mn', 'Ni', 'Ca', 'K', 'Cl', 'S', 'Si', 'Al'} 
-    
     zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
-    for ep, ap in zip(energias_picos, alturas_picos):
+    for ep in energias_picos:
         # Filtros básicos de energía
         if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0:
             continue
 
         candidatos_locales = []
-        for z in range(11, 93):
+        for z in range(11, 84):
             sym = xl.AtomicNumberToSymbol(z)
             if sym in EXCLUIR: continue
             
             try:
-                # Chequeamos las dos líneas principales
-                ka = xl.LineEnergy(z, xl.KA1_LINE)
-                la = xl.LineEnergy(z, xl.LA1_LINE)
+                info_lineas = get_Xray_info(sym)
                 
-                for e_theo in [ka, la]:
-                    if abs(e_theo - ep) < tolerance:
-                        # Calculamos un score de confianza
-                        score = 1
-                        if sym in PRIORIDAD: score += 2
-                        # Si es una línea K, le damos más peso que a una M o L difusa
-                        if e_theo == ka: score += 1 
+                # Buscamos si el pico actual coincide con alguna línea fuerte (Ka1 o La1)
+                for line_name in ["Ka1", "La1"]:
+                    if line_name in info_lineas:
+                        e_theo = info_lineas[line_name]["energy"]
                         
-                        candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
+                        if abs(e_theo - ep) < tolerance:
+                            # --- VALIDACIÓN DE CONSISTENCIA ---
+                            # Si es Ka1, buscamos su pareja Kb1
+                            check_line = "Kb1" if line_name == "Ka1" else "Lb1"
+                            
+                            if check_line in info_lineas:
+                                e_check = info_lineas[check_line]["energy"]
+                                ratio_theo = info_lineas[check_line]["ratio"]
+                                
+                                # Buscamos la intensidad real en el espectro en la posición de la línea de chequeo
+                                idx_check = np.abs(E - e_check).argmin()
+                                # El pico de chequeo debe ser al menos proporcional a la intensidad esperada
+                                # (Damos un margen amplio porque la eficiencia del detector varía)
+                                if I_net[idx_check] > (sigma_umbral * 0.5):
+                                    score = 10 if line_name == "Ka1" else 5
+                                    candidatos.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
+                            else:
+                                # Si el elemento no tiene Kb1/Lb1 en xraylib (raro), confiamos con menor score
+                                candidatos.append({'sym': sym, 'score': 2, 'diff': abs(e_theo - ep)})
+                                
             except: continue
-        
-        if candidatos_locales:
-            # Elegimos el que tenga mejor score, y en caso de empate, el de menor diferencia de energía
-            mejor = max(candidatos_locales, key=lambda x: (x['score'], -x['diff']))
+            
+        if candidatos:
+            # Seleccionamos el que tenga mejor score y mejor coincidencia de energía
+            mejor = max(candidatos, key=lambda x: (x['score'], -x['diff']))
             elementos_finales.add(mejor['sym'])
 
     return sorted(list(elementos_finales))
@@ -145,4 +155,5 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
