@@ -44,7 +44,7 @@ def snip_trace_safe(
     background = np.exp(y_final) - c
     return np.clip(background, 0, None)
 
-def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.06, sigma_umbral=5, permitir_solapamientos=False):
+def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sigma_umbral=8, permitir_solapamientos=False, todos=False):
     """
     Autodetección robusta basada en significancia estadística y probabilidad.
     """
@@ -54,15 +54,21 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.06, sig
     std_ruido = np.sqrt(np.maximum(bkg_snip, 1))
     
     # Buscamos picos que destaquen sobre el ruido local
-    indices, props = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=10)
+    indices, props = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=15, prominence=sigma_umbral*2)
     energias_picos = E[indices]
     alturas_picos = I_net[indices]
 
     elementos_finales = set(manual_elements) if manual_elements else set()
+
+    # Filtro de exclusión total de elementos "imposibles" en XRF común
+    # Elementos altamente radiactivos o inestables que ensucian el ajuste
+    if not todos:
+        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Am', 'Cm'}
+    else:
+        EXCLUIR = {}
     
-    # Lista de elementos comunes (Z del 11 al 40: Na a Zr, y metales pesados usuales)
-    # Esto evita que el solver elija Actinio (Ac) o Radio (Ra) por error.
-    Z_COMUNES = list(range(11, 41)) + [42, 47, 48, 50, 56, 74, 79, 80, 82] 
+    # Elementos con alta probabilidad (Metales de transición y geológicos comunes)
+    PRIORIDAD = {'Fe', 'Cu', 'Zn', 'Pb', 'As', 'Sr', 'Ti', 'Cr', 'Mn', 'Ni', 'Ca', 'K', 'Cl', 'S', 'Si', 'Al'} 
     
     zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
@@ -71,40 +77,31 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.06, sig
         if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0:
             continue
 
-        mejor_candidato = None
-        min_diff = tolerance
-        es_comun = False
-
-        # Buscamos en la tabla periódica (Z=11 al 92)
+        candidatos_locales = []
         for z in range(11, 93):
-            symbol = xl.AtomicNumberToSymbol(z)
+            sym = xl.AtomicNumberToSymbol(z)
+            if sym in EXCLUIR: continue
             
-            # Si ya está en manuales, saltar si no permitimos solapamiento
-            if symbol in elementos_finales and not permitir_solapamientos:
-                continue
-
             try:
-                # Priorizamos líneas K para Z bajo y L para Z alto
-                e_k = xl.LineEnergy(z, xl.KA1_LINE)
-                e_l = xl.LineEnergy(z, xl.LA1_LINE)
+                # Chequeamos las dos líneas principales
+                ka = xl.LineEnergy(z, xl.KA1_LINE)
+                la = xl.LineEnergy(z, xl.LA1_LINE)
                 
-                for e_theo in [e_k, e_l]:
-                    diff = abs(e_theo - ep)
-                    if diff < min_diff:
-                        # Lógica de desempate:
-                        # Si el nuevo candidato es "común" y el anterior no, lo preferimos
-                        # aunque la diferencia de energía sea un poco mayor.
-                        nuevo_es_comun = z in Z_COMUNES
+                for e_theo in [ka, la]:
+                    if abs(e_theo - ep) < tolerance:
+                        # Calculamos un score de confianza
+                        score = 1
+                        if sym in PRIORIDAD: score += 2
+                        # Si es una línea K, le damos más peso que a una M o L difusa
+                        if e_theo == ka: score += 1 
                         
-                        if mejor_candidato is None or (nuevo_es_comun and not es_comun) or (diff < min_diff * 0.8):
-                            mejor_candidato = symbol
-                            min_diff = diff
-                            es_comun = nuevo_es_comun
-                            
+                        candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
             except: continue
-
-        if mejor_candidato:
-            elementos_finales.add(mejor_candidato)
+        
+        if candidatos_locales:
+            # Elegimos el que tenga mejor score, y en caso de empate, el de menor diferencia de energía
+            mejor = max(candidatos_locales, key=lambda x: (x['score'], -x['diff']))
+            elementos_finales.add(mejor['sym'])
 
     return sorted(list(elementos_finales))
 
@@ -148,3 +145,4 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
