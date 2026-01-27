@@ -44,7 +44,8 @@ def snip_trace_safe(
     background = np.exp(y_final) - c
     return np.clip(background, 0, None)
 
-def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sigma_umbral=8, permitir_solapamientos=False, todos=False):
+def detectar_elementos(E, I, bkg_snip, manual_elements=None, ignorar=None, tolerance=0.05, sigma_umbral=8, 
+                       permitir_solapamientos=False, todos=False):
     """
     Autodetección robusta basada en significancia estadística y probabilidad.
     """
@@ -73,12 +74,16 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
             except: continue
 
     # Grupos de control
-    PRIORIDAD = {'Si', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Sb', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
+    PRIORIDAD = {'Si', 'Ar', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Sb', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
     TIERRAS_RARAS = {'La', 'Ce', 'Pr', 'Nd', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu'}
+    ESCASOS = {'Os', 'Ir', 'Re', 'Ru', 'Rh', 'Pd', 'Pt', 'Au', 'Hf', 'Ta'}
     if not todos:
-        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Kr', 'Xe', 'Rn'}
+        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Kr', 'Xe'}
     else:
         EXCLUIR = {}
+
+    if ignorar:
+        EXCLUIR.update(ignorar)
     
     zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
@@ -86,10 +91,9 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
         # Filtros básicos de energía
         if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0: continue
 
-        # Si NO permitimos solapamientos y el pico está cerca de un manual, ignoramos el pico
-        if not permitir_solapamientos:
-            if any(abs(ep - em) < tolerance for em in energias_manuales):
-                continue
+        # Protección de manuales: si el pico es "propiedad" de un manual, saltar
+        if not permitir_solapamientos and any(abs(ep - em) < tolerance for em in energias_manuales):
+            continue
 
         candidatos_locales = []
         for z in range(11, 84):
@@ -109,7 +113,7 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
                             score = 15 if sym in PRIORIDAD else 5
                             
                             # Penalización de tierras raras
-                            if sym in TIERRAS_RARAS:
+                            if sym in TIERRAS_RARAS or sym in ESCASOS:
                                 score -= 12 
                             
                             # Validación de pareja (Kb o Lb)
@@ -172,6 +176,7 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
 
 
