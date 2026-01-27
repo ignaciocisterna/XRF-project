@@ -131,9 +131,10 @@ class XRFDeconv:
             idx = self.offset
             for i, elem in enumerate(self.elements):
                 # Solo inicializamos si la máscara permite que sea libre
-                if mask[idx + 1] == 1:
-                    # Una semilla basada en el máximo del espectro neto es más estable
-                    p_for_L[idx + 1] = max(self.I_net) * 0.01
+                if idx + 1 < len(mask) and idx + 1 < len(p_for_L):
+                    if mask[idx + 1] == 1:
+                        # Una semilla basada en el máximo del espectro neto es más estable
+                        p_for_L[idx + 1] = max(self.I_net) * 0.01
                 idx += 3
             
             p0 = [p for p, f in zip(p_for_L, mask) if f]
@@ -189,12 +190,14 @@ class XRFDeconv:
                                       ftol=tol
                                       )
             else: #global
+                sigma_completo = np.sqrt(np.maximum(self.I, 1))
+                sigma_roi = sigma_completo[roi_mask]
                 popt, pcov = curve_fit(frx_wrapper,
                                       self.E[roi_mask],
                                       self.I[roi_mask],
                                       p0=p0_free,
                                       bounds=bounds,
-                                      sigma=np.sqrt(np.maximum(self.I, 1)),
+                                      sigma=sigma_roi,
                                       absolute_sigma=True,
                                       max_nfev=50000,
                                       xtol=tol, 
@@ -266,6 +269,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
