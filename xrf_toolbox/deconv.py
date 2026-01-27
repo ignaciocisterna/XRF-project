@@ -208,7 +208,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def animacion_carga(stop_event, mensaje):
+    def animacion_carga(self, stop_event, mensaje):
         for puntos in itertools.cycle([".", "..", "..."]):
             if stop_event.is_set():
                 break
@@ -223,7 +223,7 @@ class XRFDeconv:
         for etapa in ["K", "L", "M"]:
             stop_event = threading.Event()
             t = threading.Thread(
-                target=animacion_carga,
+                target=self.animacion_carga,
                 args=(stop_event, f"  > Ajustando Capas {etapa}")
             )
             t.start()
@@ -233,7 +233,7 @@ class XRFDeconv:
         
         stop_event = threading.Event()
         t = threading.Thread(
-            target=animacion_carga,
+            target=self.animacion_carga,
             args=(stop_event, "  > Refinando Ajuste Global")
         )
         t.start()
@@ -260,6 +260,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
