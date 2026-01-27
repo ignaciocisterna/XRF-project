@@ -73,10 +73,10 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
             except: continue
 
     # Grupos de control
-    PRIORIDAD = {'Si', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
+    PRIORIDAD = {'Si', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Sb', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
     TIERRAS_RARAS = {'La', 'Ce', 'Pr', 'Nd', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu'}
     if not todos:
-        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu'}
+        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Kr', 'Xe', 'Rn'}
     else:
         EXCLUIR = {}
     
@@ -172,6 +172,7 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
 
 
