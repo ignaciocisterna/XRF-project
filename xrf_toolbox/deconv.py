@@ -82,7 +82,7 @@ class XRFDeconv:
                             else:
                                 element_masks += [0, 0, 0] # Todo fijo para este elemento
                         except:
-                            free_masks += [0, 0, 0]
+                            element_masks += [0, 0, 0]
 
                 elif etapa == "M":
                     element_masks += [0, 0, 1]
@@ -260,6 +260,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
