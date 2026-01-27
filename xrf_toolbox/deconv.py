@@ -209,7 +209,7 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
 
     def animacion_carga(self, stop_event, mensaje):
-        for puntos in itertools.cycle([".", "..", "..."]):
+        for puntos in itertools.cycle(["",".", "..", "..."]):
             if stop_event.is_set():
                 break
             print(f"\r{mensaje}{puntos}   ", end="", flush=True)
@@ -260,6 +260,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
