@@ -36,12 +36,13 @@ class XRFDeconv:
         
 #------------------------------------------------------------------------------#
    
-    def run_identification(self, manual=None, graf=False, verbose=False, 
+    def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
                            permitir_solapamientos=False, todos=False):
         """Calcula SNIP y detecta elementos."""
         self.bkg = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP) 
         self.elements = prc.detectar_elementos(self.E, self.I, self.bkg, 
-                                               manual_elements=manual, 
+                                               manual_elements=manual,
+                                               ignorar=ignore,
                                                permitir_solapamientos=permitir_solapamientos, 
                                                todos=todos)
         if graf:
@@ -223,4 +224,5 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
