@@ -177,6 +177,22 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
 
     return E[mask], I[mask]
 
+def generar_mascara_roi(E, elementos, margen=0.4):
+    """
+    Crea una máscara booleana: True solo en las zonas donde 
+    sabemos que hay líneas de los elementos detectados.
+    """
+    mask = np.zeros_like(E, dtype=bool)
+    for sym in elementos:
+        try:
+            info = get_Xray_info(sym)
+            for datos in info.values():
+                en = datos['energy']
+                # Marcamos como True el rango alrededor de cada línea
+                mask |= (E >= en - margen) & (E <= en + margen)
+        except:
+            continue
+    return mask
 
 
 
