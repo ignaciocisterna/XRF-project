@@ -61,10 +61,10 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
 
     # Filtro de exclusión total de elementos "imposibles" en XRF común
     # Elementos altamente radiactivos o inestables que ensucian el ajuste
-    if not todos:
-        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Am', 'Cm'}
-    else:
-        EXCLUIR = {}
+    #if not todos:
+        #EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Am', 'Cm'}
+    #else:
+        #EXCLUIR = {}
     
     zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
@@ -76,40 +76,36 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
         candidatos = []
         for z in range(11, 84):
             sym = xl.AtomicNumberToSymbol(z)
-            if sym in EXCLUIR: continue
-            
             try:
-                info_lineas = get_Xray_info(sym)
+                info = get_Xray_info(sym)
                 
-                # Buscamos si el pico actual coincide con alguna línea fuerte (Ka1 o La1)
-                for line_name in ["Ka1", "La1"]:
-                    if line_name in info_lineas:
-                        e_theo = info_lineas[line_name]["energy"]
-                        
+                for fam_root in ["Ka1", "La1"]:
+                    if fam_root in info:
+                        e_theo = info[fam_root]["energy"]
                         if abs(e_theo - ep) < tolerance:
-                            # --- VALIDACIÓN DE CONSISTENCIA ---
-                            # Si es Ka1, buscamos su pareja Kb1
-                            check_line = "Kb1" if line_name == "Ka1" else "Lb1"
+                            score = 0
                             
-                            if check_line in info_lineas:
-                                e_check = info_lineas[check_line]["energy"]
-                                ratio_theo = info_lineas[check_line]["ratio"]
+                            # PRUEBA DE FUEGO: Consistencia de Familia
+                            check_line = "Kb1" if fam_root == "Ka1" else "Lb1"
+                            if check_line in info:
+                                e_check = info[check_line]["energy"]
+                                ratio_theo = info[check_line]["ratio"]
+                                idx_c = np.abs(E - e_check).argmin()
                                 
-                                # Buscamos la intensidad real en el espectro en la posición de la línea de chequeo
-                                idx_check = np.abs(E - e_check).argmin()
-                                # El pico de chequeo debe ser al menos proporcional a la intensidad esperada
-                                # (Damos un margen amplio porque la eficiencia del detector varía)
-                                if I_net[idx_check] > (sigma_umbral * 0.5):
-                                    score = 10 if line_name == "Ka1" else 5
-                                    candidatos.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
-                            else:
-                                # Si el elemento no tiene Kb1/Lb1 en xraylib (raro), confiamos con menor score
-                                candidatos.append({'sym': sym, 'score': 2, 'diff': abs(e_theo - ep)})
+                                # Si hay señal donde debería estar la línea secundaria...
+                                if I_net[idx_c] > (sigma_umbral * 0.8):
+                                    score += 15
+                                    # Bonus por ser elemento común
+                                    if sym in METALES_BASE: score += 10
+                            
+                            # Penalización a tierras raras si no hay confirmación extrema
+                            if sym in TIERRAS_RARAS: score -= 5
                                 
+                            if score > 5: # Solo entran los que pasan una validación mínima
+                                candidatos.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
             except: continue
             
         if candidatos:
-            # Seleccionamos el que tenga mejor score y mejor coincidencia de energía
             mejor = max(candidatos, key=lambda x: (x['score'], -x['diff']))
             elementos_finales.add(mejor['sym'])
 
@@ -155,6 +151,7 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
 
 
