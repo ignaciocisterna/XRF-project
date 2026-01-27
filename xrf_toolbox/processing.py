@@ -73,7 +73,7 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
         if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0:
             continue
 
-        candidatos_locales = []
+        candidatos = []
         for z in range(11, 84):
             sym = xl.AtomicNumberToSymbol(z)
             if sym in EXCLUIR: continue
@@ -155,5 +155,6 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
 
