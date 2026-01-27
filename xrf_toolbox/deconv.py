@@ -25,6 +25,7 @@ class XRFDeconv:
         
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
+        self.I_net = None
         self.bkg = None
         self.elements = []
         self.p_actual = None
@@ -42,7 +43,11 @@ class XRFDeconv:
     def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
                            permitir_solapamientos=False, todos=False):
         """Calcula SNIP y detecta elementos."""
-        self.bkg = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP) 
+        self.bkg = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
+                               
+        self.I_net = self.I - self.bkg
+        self.I_net[self.I_net < 0] = 0 # Limpieza de valores negativos
+                               
         self.elements = prc.detectar_elementos(self.E, self.I, self.bkg, 
                                                manual_elements=manual,
                                                ignorar=ignore,
@@ -110,9 +115,10 @@ class XRFDeconv:
                 # a, b, c0, c1, c2, Ray, Comp
                 p0 = [0.0057, 0.00252, c0_init, c1_init, 0.0, rayleigh_init, compton_init]
 
-            I_net = self.I - self.bkg
-            I_net[I_net < 0] = 0
-            area_init = np.trapezoid(I_net, self.E) / len(self.elements)
+            if self.I_net is None: 
+                self.I_net = np.maximum(self.I - self.bkg, 0)
+                
+            area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for _ in self.elements:
                 p0 += [
@@ -127,7 +133,7 @@ class XRFDeconv:
                 # Solo inicializamos si la máscara permite que sea libre
                 if mask[idx + 1] == 1:
                     # Una semilla basada en el máximo del espectro neto es más estable
-                    p_for_L[idx + 1] = max(I_net) * 0.01
+                    p_for_L[idx + 1] = max(self.I_net) * 0.01
                 idx += 3
             
             p0 = [p for p, f in zip(p_for_L, mask) if f]
@@ -260,6 +266,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
