@@ -72,28 +72,24 @@ class XRFDeconv:
             
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
             element_masks = []
-            for _ in range(n_elem):
-                if etapa == "K":
-                    element_masks += [1, 0, 0]
-
-                elif etapa == "L":
-                    for elem in self.elements:
-                        try:
-                            info = core.get_Xray_info(elem, families=("L",))
-                            # Verificamos si al menos una línea L está en el rango E
-                            tiene_L_en_rango = any(self.E.min() <= d['energy'] <= self.E.max() for d in info.values())
-                            if tiene_L_en_rango:
-                                element_masks += [0, 1, 0] # K fijo, L libre, M fijo
-                            else:
-                                element_masks += [0, 0, 0] # Todo fijo para este elemento
-                        except:
-                            element_masks += [0, 0, 0]
-
-                elif etapa == "M":
-                    element_masks += [0, 0, 1]
-
-                else: # global
-                    element_masks += [1, 1, 1]
+        
+            for elem in self.elements:
+            # Inicializamos los 3 slots para este elemento [K, L, M]
+            slots = [0, 0, 0] 
+            if etapa == "K":
+                slots[0] = 1
+            elif etapa == "L":
+                try:
+                    info = core.get_Xray_info(elem, families=("L",))
+                    tiene_L = any(self.E.min() <= d['energy'] <= self.E.max() for d in info.values())
+                    if tiene_L: slots[1] = 1
+                except: pass
+            elif etapa == "M":
+                slots[2] = 1
+            elif etapa == "global":
+                slots = [1, 1, 1]
+            
+            element_masks.extend(slots)
                     
             return mask_base + element_masks
 
@@ -126,24 +122,25 @@ class XRFDeconv:
                     0,                      # L
                     0                       # M
                 ]
-        elif etapa == "L":
-            p_for_L = self.p_actual.copy()
-            idx = self.offset
-            for i, elem in enumerate(self.elements):
-                # Solo inicializamos si la máscara permite que sea libre
-                if idx + 1 < len(mask) and idx + 1 < len(p_for_L):
-                    if mask[idx + 1] == 1:
-                        # Una semilla basada en el máximo del espectro neto es más estable
-                        p_for_L[idx + 1] = max(self.I_net) * 0.01
-                idx += 3
+            return p0
+        elif etapa == "L" or etapa == "M" or etapa == "global":
+            # Creamos una copia del estado actual de los parámetros
+            p_working = self.p_actual.copy()
             
-            p0 = [p for p, f in zip(p_for_L, mask) if f]
-
-        else: # etapa M o Global 
-            p_for_M_or_G = self.p_actual.copy()
-            p0 = [p for p, f in zip(p_for_M_or_G, mask) if f]
-
-        return p0
+            if etapa == "L":
+                # En lugar de un bucle manual, usamos la máscara que acabamos de crear
+                # para saber dónde inyectar la semilla de intensidad
+                for i in range(self.offset, len(p_working)):
+                    # Si la máscara dice que este parámetro es una 'Area L' libre:
+                    if i < len(mask) and mask[i] == 1:
+                        # Solo aplicamos la semilla si el parámetro está en un slot de Area L
+                        # (posiciones offset+1, offset+4, offset+7...)
+                        if (i - self.offset) % 3 == 1:
+                            p_working[i] = np.max(self.I_net) * 0.01
+            
+            # Filtramos solo los parámetros que la etapa permite mover
+            p0 = [p for p, f in zip(p_working, mask) if f]
+            return p0
 
 #------------------------------------------------------------------------------#
 
@@ -269,6 +266,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
