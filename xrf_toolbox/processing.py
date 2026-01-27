@@ -49,65 +49,86 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, tolerance=0.05, sig
     Autodetección robusta basada en significancia estadística y probabilidad.
     """
     I_net = I - bkg_snip
+    max_counts = np.max(I_net)
     # Calculamos la desviación estándar del ruido basada en el fondo (Poisson)
     # Un pico es real si supera el fondo en N sigmas.
     std_ruido = np.sqrt(np.maximum(bkg_snip, 1))
     
     # Buscamos picos que destaquen sobre el ruido local
-    indices, props = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=15, prominence=sigma_umbral*2)
+    indices, _ = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=15, prominence=max_counts * 0.005)
     energias_picos = E[indices]
 
-    elementos_finales = set(manual_elements) if manual_elements else set()
+    # 1. Inclusión de elementos manuales
+    manuales = set(manual_elements) if manual_elements else set()
+    elementos_finales = manuales.copy()
 
-    # Filtro de exclusión total de elementos "imposibles" en XRF común
-    # Elementos altamente radiactivos o inestables que ensucian el ajuste
-    #if not todos:
-        #EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Am', 'Cm'}
-    #else:
-        #EXCLUIR = {}
+    # Pre-calculo de energías de manuales para control de solapamiento
+    energias_manuales = []
+    if not permitir_solapamientos:
+        for m in manuales:
+            try:
+                info_m = get_Xray_info(m)
+                if "Ka1" in info_m: energias_manuales.append(info_m["Ka1"]["energy"])
+                if "La1" in info_m: energias_manuales.append(info_m["La1"]["energy"])
+            except: continue
+
+    # Grupos de control
+    PRIORIDAD = {'Si', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
+    TIERRAS_RARAS = {'La', 'Ce', 'Pr', 'Nd', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu'}
+    if not todos:
+        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu'}
+    else:
+        EXCLUIR = {}
     
     zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
 
     for ep in energias_picos:
         # Filtros básicos de energía
-        if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0:
-            continue
+        if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0: continue
 
-        candidatos = []
+        # Si NO permitimos solapamientos y el pico está cerca de un manual, ignoramos el pico
+        if not permitir_solapamientos:
+            if any(abs(ep - em) < tolerance for em in energias_manuales):
+                continue
+
+        candidatos_locales = []
         for z in range(11, 84):
             sym = xl.AtomicNumberToSymbol(z)
+            
+            # Si el elemento ya está en manuales, no lo buscamos de nuevo como auto-detectado
+            if sym in elementos_finales and not permitir_solapamientos:
+                continue
+            if sym in EXCLUIR: continue
+            
             try:
                 info = get_Xray_info(sym)
-                
-                for fam_root in ["Ka1", "La1"]:
-                    if fam_root in info:
-                        e_theo = info[fam_root]["energy"]
+                for fam in ["Ka1", "La1"]:
+                    if fam in info:
+                        e_theo = info[fam]["energy"]
                         if abs(e_theo - ep) < tolerance:
-                            score = 0
+                            score = 15 if sym in PRIORIDAD else 5
                             
-                            # PRUEBA DE FUEGO: Consistencia de Familia
-                            check_line = "Kb1" if fam_root == "Ka1" else "Lb1"
+                            # Penalización de tierras raras
+                            if sym in TIERRAS_RARAS:
+                                score -= 12 
+                            
+                            # Validación de pareja (Kb o Lb)
+                            check_line = "Kb1" if fam == "Ka1" else "Lb1"
                             if check_line in info:
                                 e_check = info[check_line]["energy"]
-                                ratio_theo = info[check_line]["ratio"]
                                 idx_c = np.abs(E - e_check).argmin()
-                                
-                                # Si hay señal donde debería estar la línea secundaria...
-                                if I_net[idx_c] > (sigma_umbral * 0.8):
-                                    score += 15
-                                    # Bonus por ser elemento común
-                                    if sym in METALES_BASE: score += 10
+                                if I_net[idx_c] > 4 * std_ruido[idx_c]:
+                                    score += 25 
+                                else:
+                                    score -= 10
                             
-                            # Penalización a tierras raras si no hay confirmación extrema
-                            if sym in TIERRAS_RARAS: score -= 5
-                                
-                            if score > 5: # Solo entran los que pasan una validación mínima
-                                candidatos.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
+                            candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
             except: continue
-            
-        if candidatos:
-            mejor = max(candidatos, key=lambda x: (x['score'], -x['diff']))
-            elementos_finales.add(mejor['sym'])
+        
+        if candidatos_locales:
+            mejor = max(candidatos_locales, key=lambda x: (x['score'], -x['diff']))
+            if mejor['score'] > 8:
+                elementos_finales.add(mejor['sym'])
 
     return sorted(list(elementos_finales))
 
@@ -151,6 +172,7 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
     
 
     return E[mask], I[mask]
+
 
 
 
