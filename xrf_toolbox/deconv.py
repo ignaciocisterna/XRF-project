@@ -74,22 +74,22 @@ class XRFDeconv:
             element_masks = []
         
             for elem in self.elements:
-            # Inicializamos los 3 slots para este elemento [K, L, M]
-            slots = [0, 0, 0] 
-            if etapa == "K":
-                slots[0] = 1
-            elif etapa == "L":
-                try:
-                    info = core.get_Xray_info(elem, families=("L",))
-                    tiene_L = any(self.E.min() <= d['energy'] <= self.E.max() for d in info.values())
-                    if tiene_L: slots[1] = 1
-                except: pass
-            elif etapa == "M":
-                slots[2] = 1
-            elif etapa == "global":
-                slots = [1, 1, 1]
-            
-            element_masks.extend(slots)
+                # Inicializamos los 3 slots para este elemento [K, L, M]
+                slots = [0, 0, 0] 
+                if etapa == "K":
+                    slots[0] = 1
+                elif etapa == "L":
+                    try:
+                        info = core.get_Xray_info(elem, families=("L",))
+                        tiene_L = any(self.E.min() <= d['energy'] <= self.E.max() for d in info.values())
+                        if tiene_L: slots[1] = 1
+                    except: pass
+                elif etapa == "M":
+                    slots[2] = 1
+                elif etapa == "global":
+                    slots = [1, 1, 1]
+                
+                element_masks.extend(slots)
                     
             return mask_base + element_masks
 
@@ -266,6 +266,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
