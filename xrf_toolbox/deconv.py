@@ -230,8 +230,8 @@ class XRFDeconv:
                                       x_scale='jac', 
                                       loss='huber',
                                       max_nfev=50000,
-                                      xtol=tol, 
-                                      ftol=tol 
+                                      xtol=1e-5, 
+                                      ftol=1e-5 
                                   )
                 self.pcov = pcov 
 
@@ -299,6 +299,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
