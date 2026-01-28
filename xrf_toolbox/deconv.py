@@ -144,7 +144,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-8):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-6):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -234,7 +234,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-8):
+    def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-6):
         """Ejecuta el pipeline completo de ajuste secuencial."""
         for etapa in ["K", "L", "M"]:
             stop_event = threading.Event()
@@ -276,6 +276,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
