@@ -174,6 +174,7 @@ class XRFDeconv:
                 # Límites para áreas de picos
                 lower_bounds.append(0.0) 
                 upper_bounds.append(techo_cuentas)
+        bounds = (lower_bounds, upper_bounds)
 
         roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
@@ -289,6 +290,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
