@@ -81,7 +81,7 @@ class XRFDeconv:
                 elif etapa == "L":
                     try:
                         info = core.get_Xray_info(elem, families=("L",))
-                        tiene_L = any(self.E.min() <= d['energy'] <= self.E.max() for d in info.values())
+                        tiene_L = any((self.E.min() + 0.25) <= d['energy'] <= (self.E.max() - 0.25) for d in info.values())
                         if tiene_L: slots[1] = 1
                     except: pass
                 elif etapa == "M":
@@ -158,9 +158,22 @@ class XRFDeconv:
             params = core.pack_params(p_full, self.elements, fondo=self.fondo)
             return core.FRX_model_sdd_general(E_val, params)
         
-        lower_bounds = [0] * len(p0_free)
-        upper_bounds = [np.inf] * len(p0_free)
-        bounds = (lower_bounds, upper_bounds)
+        # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
+        # es más que suficiente para cualquier pico real.
+        techo_cuentas = np.max(self.I) * 1.5
+        
+        lower_bounds = []
+        upper_bounds = []
+        
+        for i, p in enumerate(p0_free):
+            # Límites para parámetros de fondo (offset)
+            if i < self.offset:
+                lower_bounds.append(0.0)
+                upper_bounds.append(np.inf)
+            else:
+                # Límites para áreas de picos
+                lower_bounds.append(0.0) 
+                upper_bounds.append(techo_cuentas)
 
         roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
@@ -276,6 +289,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
