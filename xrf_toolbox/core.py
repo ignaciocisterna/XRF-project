@@ -28,6 +28,27 @@ def get_Xray_info(symb, families=("K", "L", "M")):
         "Ma2": xl.MA2_LINE,
         "Mb":  xl.MB_LINE,
     }
+
+    # Mapeo de líneas a sus niveles de transición para calcular el ancho (gamma)
+    # Formato: (Nivel Inicial, Nivel Final)
+    LINE_LEVELS = {
+        "Ka1": (xl.K_SHELL, xl.L3_SHELL),
+        "Ka2": (xl.K_SHELL, xl.L2_SHELL),
+        "Kb1": (xl.K_SHELL, xl.M3_SHELL),
+        "Kb3": (xl.K_SHELL, xl.M2_SHELL),
+        "Kb5": (xl.K_SHELL, xl.M4_SHELL),
+        "La1": (xl.L3_SHELL, xl.M5_SHELL),
+        "La2": (xl.L3_SHELL, xl.M4_SHELL),
+        "Lb1": (xl.L2_SHELL, xl.M4_SHELL),
+        "Lb2": (xl.L3_SHELL, xl.N5_SHELL),
+        "Lb3": (xl.L1_SHELL, xl.M3_SHELL),
+        "Lb4": (xl.L1_SHELL, xl.M2_SHELL),
+        "Lg1": (xl.L2_SHELL, xl.N4_SHELL),
+        "Ma1": (xl.M5_SHELL, xl.N7_SHELL),
+        "Ma2": (xl.M5_SHELL, xl.N6_SHELL),
+        "Mb":  (xl.M4_SHELL, xl.N6_SHELL),
+    }
+    
     info = {}
 
     families_def = {
@@ -54,9 +75,20 @@ def get_Xray_info(symb, families=("K", "L", "M")):
                 rate = xl.RadRate(Z, line_id)
 
                 if energy > 0 and rate > 0:
+                    # --- CÁLCULO DE GAMMA (Lorentziano) ---
+                    # El ancho de la línea es la suma de los anchos de los niveles involucrados
+                    lvl_init, lvl_final = LINE_LEVELS[name]
+                    gamma_total_keV = (xl.AtomicLevelWidth(Z, lvl_init) + 
+                                       xl.AtomicLevelWidth(Z, lvl_final))
+                    
+                    # Para voigt_profile(sigma, gamma), gamma suele ser el HWHM 
+                    # xraylib devuelve el ancho total (FWHM), por eso dividimos por 2
+                    gamma_hwhm = gamma_total_keV / 2.0
+                    
                     info[name] = {
                         "energy": energy,
-                        "ratio": rate / ref_rate
+                        "ratio": rate / ref_rate,
+                        "gamma": gamma_hwhm
                     }
 
             except ValueError:
@@ -67,13 +99,29 @@ def get_Xray_info(symb, families=("K", "L", "M")):
 
     return info
 
+# Correción de ganacia y deriva energéticas
+def energy_corr(E, gain, offset):
+    return E * gain + offset
+
 # Resolución Energética para detector tipo SDD (usado en PICOFOX)
 
 # Para modelo
-def sigma_E(E, a=0.0057, b=0.00252):
-    #a = 0.0057    # Datos de S2 PICOFOX
-    #b = 0.00252   # Datos de S2 PICOFOX
-    return np.sqrt(a + b * E)
+def sigma_E(E, noise=0.06, fano=0.115, epsilon=0.00365):
+    """
+    E: Energía en keV
+    noise: Ruido electrónico constante (FWHM en keV)
+    fano: Factor de Fano (adimensional, ~0.115 para Si)
+    epsilon: Energía de creación de par en Si (en keV, 0.00365)
+    """
+    cte_conv_geo_Gauss = 2.355
+    # Contribución de ruido electrónico
+    noise_term = noise**2
+    # Contribución de Fano
+    fano_term = (cte_conv_geo_Gauss**2) * fano * epsilon * E
+    # FWHM total
+    fwhm_total = np.sqrt(noise_term + fano_term)
+    # Desviación estándar para perfil Voight
+    return fwhm_total / cte_conv_geo_Gauss
 
 # Para SNIP
 def fwhm_SNIP(E, gamma=1.2):
@@ -114,17 +162,20 @@ def is_excitable_Mo(Z, family):
     return True
 
 # Modelo
-def FRX_model_sdd_general(E, params):
+def FRX_model_sdd_general(E_raw, params):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
     en area_K, area_L y area_M respectivamente.
     """
 
-    gamma = 0.02  # keV, típico SDD (corroborar)
-    a, b = params["a"], params["b"]
+    gain = params.get("gain_corr", 1.0)
+    offset = params.get("offset_corr", 0.0)
+    E = energy_corr(E_raw, gain, offset)
+    
+    #gamma = 0.02  # keV, típico SDD (corroborar)
+    noise, fano, epsilon = params["noise"], params["fano"], params["epsilon"]
 
-    sigma = sigma_E(E, a, b)
     spectrum = np.zeros_like(E)
 
     for elem, elem_params in params["elements"].items():
@@ -139,6 +190,8 @@ def FRX_model_sdd_general(E, params):
         for line, line_data in info.items():
             E0 = line_data["energy"]
             r  = line_data["ratio"]
+            gamma = line_data["gamma"]
+            sigma = sigma_E(E0, noise, fano, epsilon)
 
             fam = line_family(line)
             if fam is None:
@@ -164,19 +217,17 @@ def FRX_model_sdd_general(E, params):
                 gamma
             )
 
-    # Picos de Dispersión (Rayleigh y Compton del Mo)
-    # Rayleigh: Elástico (17.44 keV)
-    # Compton: Inelástico (aprox 17.1 keV, depende del ángulo del detector)
+    # Picos de Dispersión (Rayleigh y Compton)
+    # Rayleigh: Elástico 
+    # Compton: Inelástico (depende del ángulo del detector)
     area_ray, area_com = params.get("scat_areas", (0, 0))
     spectrum += voigt_peak(E, area_ray, 17.44, sigma, gamma) # Rayleigh
     spectrum += voigt_peak(E, area_com, 17.10, sigma, gamma) # Compton (ajustable)
 
-    # Fondo dinámico
+   # --- FONDO DINÁMICO ---
     bkg_coeffs = params["background"]
-    if len(bkg_coeffs) == 2:   # Lineal: c0 + c1*E
-        background = bkg_coeffs[0] + bkg_coeffs[1] * E
-    elif len(bkg_coeffs) == 3: # Cuadrático: c0 + c1*E + c2*E^2
-        background = bkg_coeffs[0] + bkg_coeffs[1] * E + bkg_coeffs[2] * E**2
+    # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
+    background = np.polyval(bkg_coeffs[::-1], E)
     
     # spectrum es la suma de picos calculada previamente
     return spectrum + background
@@ -187,19 +238,20 @@ def pack_params(p, elements, fondo="lin"):
     Empaqueta los parámetros en un diccionario, adaptándose al modelo de fondo.
     """
     params = {
-        "a": p[0],
-        "b": p[1],
+        "noise": p[0],
+        "fano": p[1],
+        "epsilon": p[2],
         "elements": {}
     }
 
     if fondo == "lin":
-        params["background"] = (p[2], p[3])      # c0, c1
-        params["scat_areas"] = (p[4], p[5])      # Rayleigh, Compton
-        idx_start_elements = 6
-    elif fondo == "cuad":
-        params["background"] = (p[2], p[3], p[4]) # c0, c1, c2
+        params["background"] = (p[3], p[4])      # c0, c1
         params["scat_areas"] = (p[5], p[6])      # Rayleigh, Compton
         idx_start_elements = 7
+    elif fondo == "cuad":
+        params["background"] = (p[3], p[4], p[5]) # c0, c1, c2
+        params["scat_areas"] = (p[6], p[7])      # Rayleigh, Compton
+        idx_start_elements = 8
     else:
         raise ValueError("El fondo debe ser 'lin' o 'cuad'")
 
@@ -228,4 +280,5 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
