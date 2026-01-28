@@ -144,7 +144,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-8):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -189,6 +189,13 @@ class XRFDeconv:
             else: #global
                 sigma_completo = np.sqrt(np.maximum(self.I, 1))
                 sigma_roi = sigma_completo[roi_mask]
+
+                # REFUERZO DE SEMILLA: Antes de entrar, asegurémonos de que 
+                # las áreas no estén en cero si el solver se rindió antes.
+                for i in range(self.offset, len(p0_free)):
+                    if p0_free[i] < 1.0: # Si el área es ridículamente baja
+                         p0_free[i] = 100.0 # Le damos un empujón inicial
+                        
                 popt, pcov = curve_fit(frx_wrapper,
                                       self.E[roi_mask],
                                       self.I[roi_mask],
@@ -196,6 +203,9 @@ class XRFDeconv:
                                       bounds=bounds,
                                       sigma=sigma_roi,
                                       absolute_sigma=True,
+                                      method='trf', 
+                                      x_scale='jac', 
+                                      loss='huber',
                                       max_nfev=50000,
                                       xtol=tol, 
                                       ftol=tol 
@@ -266,6 +276,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
