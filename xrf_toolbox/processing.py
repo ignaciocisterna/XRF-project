@@ -136,7 +136,7 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, ignorar=None, toler
 
     return sorted(list(elementos_finales))
 
-def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_kev=0.2):
+def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_kev=0.25):
     """
     Recorta el espectro eliminando el ruido electrónico inicial mediante 
     el análisis de la segunda derivada (curvatura) y aplica el límite superior.
@@ -193,6 +193,7 @@ def generar_mascara_roi(E, elementos, margen=0.4, borde=0.1):
         except:
             continue
     return mask
+
 
 
 
