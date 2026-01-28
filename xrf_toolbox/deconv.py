@@ -206,9 +206,9 @@ class XRFDeconv:
 
                 # REFUERZO DE SEMILLA: Antes de entrar, asegurémonos de que 
                 # las áreas no estén en cero si el solver se rindió antes.
-                for i in range(self.offset, len(p0_free)):
-                    if p0_free[i] < 1.0: # Si el área es ridículamente baja
-                         p0_free[i] = 100.0 # Le damos un empujón inicial
+                #for i in range(self.offset, len(p0_free)):
+                #    if p0_free[i] < 1.0: # Si el área es ridículamente baja
+                #         p0_free[i] = 100.0 # Le damos un empujón inicial
                         
                 popt, pcov = curve_fit(frx_wrapper,
                                       self.E[roi_mask],
@@ -290,6 +290,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
