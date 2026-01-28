@@ -164,7 +164,7 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_kev=0.2):
         
         # 4. Aplicar offset de seguridad
         # Desplazamos unos cuantos keV a la derecha para no morder el flanco del ruido
-        e_min_detectado = E_sub[idx_final] + offset_kev
+        e_min_detectado = E_sub[idx_corte] + offset_kev
 
     # 5. Validaciones de seguridad
     if e_min_detectado < 0.05:
@@ -193,6 +193,7 @@ def generar_mascara_roi(E, elementos, margen=0.4, borde=0.1):
         except:
             continue
     return mask
+
 
 
 
