@@ -12,11 +12,9 @@ dependencies = [
     "matplotlib",
     "pandas",
     "xraylib",
-    "time",
-    "intertools",
-    "threading"
 ]
 
 [tool.setuptools.packages.find]
 
 where = ["."]
+
