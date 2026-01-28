@@ -206,9 +206,18 @@ class XRFDeconv:
 
                 # REFUERZO DE SEMILLA: Antes de entrar, asegurémonos de que 
                 # las áreas no estén en cero si el solver se rindió antes.
-                #for i in range(self.offset, len(p0_free)):
-                #    if p0_free[i] < 1.0: # Si el área es ridículamente baja
-                #         p0_free[i] = 100.0 # Le damos un empujón inicial
+                max_I = np.max(self.I_net)
+                semilla_minima = max_I * 0.005 # 0.5% del pico máximo
+                
+                for i in range(self.offset, len(p0_free)):
+                    # Solo reforzamos si el área está muy cerca de cero
+                    if p0_free[i] < 0.1: 
+                        # Si es una línea K (el primer slot de cada 3) le damos un empujoncito
+                        if (i - self.offset) % 3 == 0:
+                            p0_free[i] = semilla_minima
+                        # Para L y M (slots 1 y 2), mejor dejarlos en 0 o algo ínfimo
+                        else:
+                            p0_free[i] = 0.01
                         
                 popt, pcov = curve_fit(frx_wrapper,
                                       self.E[roi_mask],
@@ -290,6 +299,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
