@@ -136,7 +136,7 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, ignorar=None, toler
 
     return sorted(list(elementos_finales))
 
-def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
+def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_kev=0.2):
     """
     Recorta el espectro eliminando el ruido electrónico inicial mediante 
     el análisis de la segunda derivada (curvatura) y aplica el límite superior.
@@ -153,19 +153,18 @@ def recortar_espectro(E, I, e_min_busqueda=1.2, e_max=17.5, offset_bins=2):
         # 2. Transformación logarítmica y suavizado
         # El logaritmo ayuda a resaltar el cambio de curvatura en caídas exponenciales
         I_log = np.log(I_sub + 1.0)
-        I_smooth = gaussian_filter1d(I_log, sigma=2)
+        I_smooth = gaussian_filter1d(I_log, sigma=1.5)
         
         # 3. Calcular la segunda derivada (Aceleración de la curva)
         # El punto de máxima curvatura positiva indica el "frenazo" del ruido
         d2 = np.gradient(np.gradient(I_smooth))
         
-        # Buscamos el índice del máximo de la segunda derivada
+        # Buscamos el índice del máximo de la segunda derivada 
         idx_corte = np.argmax(d2)
         
         # 4. Aplicar offset de seguridad
-        # Desplazamos un par de canales a la derecha para no morder el flanco del ruido
-        idx_final = min(idx_corte + offset_bins, len(E_sub) - 1)
-        e_min_detectado = E_sub[idx_final]
+        # Desplazamos unos cuantos keV a la derecha para no morder el flanco del ruido
+        e_min_detectado = E_sub[idx_final] + offset_kev
 
     # 5. Validaciones de seguridad
     if e_min_detectado < 0.05:
@@ -193,6 +192,7 @@ def generar_mascara_roi(E, elementos, margen=0.4):
         except:
             continue
     return mask
+
 
 
 
