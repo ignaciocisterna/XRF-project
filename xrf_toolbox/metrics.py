@@ -94,10 +94,16 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
     final_params = core.pack_params(p_to_use, elementos, fondo=fondo)
+    bkg_coeffs = final_params["background"]
+    if fondo == "lin":
+        background = bkg_coeffs[0] + bkg_coeffs[1] * E
+    else:
+        background = bkg_coeffs[0] + bkg_coeffs[1] * E + bkg_coeffs[2] * E**2
     
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, I_fit, label='Modelo Ajustado', color='red', lw=1.5, alpha=0.8)
+    plt.plot(E, background, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
 
     etiquetas_info = []
 
