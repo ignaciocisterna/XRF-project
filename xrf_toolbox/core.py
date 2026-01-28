@@ -162,7 +162,7 @@ def is_excitable_Mo(Z, family):
     return True
 
 # Modelo
-def FRX_model_sdd_general(E_raw, params):
+def FRX_model_sdd_general(E_raw, params, config=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
@@ -280,5 +280,6 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
