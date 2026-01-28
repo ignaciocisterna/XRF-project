@@ -161,19 +161,27 @@ class XRFDeconv:
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
         techo_cuentas = np.max(self.I) * 1.5
+
+        A_LIMITS = (0.003, 0.015) 
+        B_LIMITS = (0.0005, 0.005)
         
         lower_bounds = []
         upper_bounds = []
         
         for i, p in enumerate(p0_free):
-            # Límites para parámetros de fondo (offset)
-            if i < self.offset:
+            if i == 0: # Parámetro 'a'
+                lower_bounds.append(A_LIMITS[0])
+                upper_bounds.append(A_LIMITS[1])
+            elif i == 1: # Parámetro 'b'
+                lower_bounds.append(B_LIMITS[0])
+                upper_bounds.append(B_LIMITS[1])
+            elif i < self.offset: # El resto del fondo (c0, c1, c2, Ray, Comp)
                 lower_bounds.append(0.0)
                 upper_bounds.append(np.inf)
-            else:
-                # Límites para áreas de picos
+            else: # Áreas de picos
                 lower_bounds.append(0.0) 
                 upper_bounds.append(techo_cuentas)
+        
         bounds = (lower_bounds, upper_bounds)
 
         roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
@@ -299,6 +307,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
