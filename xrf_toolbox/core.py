@@ -169,6 +169,7 @@ def get_efficiency(energy, config):
     
     return trans_be * trans_dead * abs_si
 
+# Probabilidad de peak de escape
 def get_escape_ratio(E0):
     """
     Calcula la probabilidad de escape de Si Ka usando el modelo de Reed.
@@ -196,6 +197,44 @@ def get_escape_ratio(E0):
     ratio = 0.5 * omega_k * r_k * (1 - (mu_si / mu_inc) * np.log(1 + mu_inc / mu_si))
     
     return max(0, ratio)
+
+# Modificador de peak para añadir peak de escape y suma
+def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, config):
+    """
+    Agrega picos de Escape y Suma a un espectro a partir de un pico principal.
+    
+    area: área del pico principal.
+    E0: energía del pico principal.
+    params: debe contener 'tau_pileup' y 'live_time'.
+    """
+    # 1. PICO DE ESCAPE (Si K-alpha)
+    # Usamos la función zero-hardcode que definimos antes
+    ratio_esc = get_escape_ratio(E0)
+    if ratio_esc > 0:
+        E_esc = E0 - 1.74  # Energía desplazada por el escape del Si
+        # Recalculamos la resolución para la nueva energía
+        s_esc = sigma_E(E_esc, params["noise"], params["fano"], params["epsilon"])
+        spectrum += voigt_peak(E, area * ratio_esc, E_esc, s_esc, gamma)
+
+    # 2. PICO DE SUMA (Pile-up: E0 + E0)
+    # Obtenemos tau y live_time del diccionario de parámetros
+    tau = params.get("tau_pileup", 0.0)
+    live_time = params.get("live_time", 1.0)
+    
+    if tau > 0 and area > 0:
+        # Probabilidad de suma: R * tau, donde R es la tasa de cuentas (Area / T_live)
+        prob_sum = (area / live_time) * tau
+        E_sum = E0 * 2
+        s_sum = sigma_E(E_sum, params["noise"], params["fano"], params["epsilon"])
+
+        # Corrección de eficiencia: El detector es menos eficiente a E_sum que a E0
+        # Multiplicamos por (Eff_sum / Eff_original)
+        eff_corr = get_efficiency(E_sum, config) / get_efficiency(E0, config)
+        
+        # El pico de suma hereda el perfil (gamma) del pico original
+        spectrum += voigt_peak(E, area, E_sum, s_sum, gamma) * prob_sum * eff_corr
+        
+    return spectrum
 
 # --- MODELO DE ESPECTRO ---
 
@@ -313,13 +352,12 @@ def FRX_model_sdd_general(E_raw, params, config):
                 continue
 
             sigma = sigma_E(E0, noise, fano, epsilon)
-            spectrum += voigt_peak(
-                E,
-                A * r,
-                E0,
-                sigma,
-                gamma
-            ) * get_efficiency(E0, config)
+            # 1. Pico Principal: Área * Ratio * Perfil * Eficiencia_Instrumental
+            spectrum += voigt_peak(E, A * r, E0, sigma, gamma) * get_efficiency(E0, config)
+
+            # 2. Artefactos: Escape y Suma
+            # Nota: Pasamos el área para que la función maneje los satélites
+            spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, config)
 
     # --- PICOS DE DISPERSIÓN ---
     # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
@@ -367,22 +405,28 @@ def pack_params(p, elements, fondo="lin"):
     Empaqueta los parámetros en un diccionario, adaptándose al modelo de fondo.
     """
     params = {
-        "noise": p[0],
-        "fano": p[1],
-        "epsilon": p[2],
+        "noise": p[0], "fano": p[1], "epsilon": p[2],
+        "tau_pileup": p[3],
+        "live_time": p[4],
         "elements": {}
     }
 
     if fondo == "lin":
-        params["background"] = (p[3], p[4])      # c0, c1
-        params["scat_areas"] = {"ray_K": p[5], "com_K": p[6], "ray_L": p[7], "com_L": p[8]}    # Rayleigh, Compton
-        idx_start_elements = 9
+        params["background"] = (p[5], p[6])
+        params["scat_areas"] = {
+            "ray_K": p[7], "com_K": p[8], 
+            "ray_L": p[9], "com_L": p[10]
+        }
+        idx = 11
     elif fondo == "cuad":
-        params["background"] = (p[3], p[4], p[5]) # c0, c1, c2
-        params["scat_areas"] = {"ray_K": p[6], "com_K": p[7], "ray_L": p[8], "com_L": p[9]}    # Rayleigh, Compton
-        idx_start_elements = 10
+        params["background"] = (p[5], p[6], p[7])
+        params["scat_areas"] = {
+            "ray_K": p[8], "com_K": p[9], 
+            "ray_L": p[10], "com_L": p[11]
+        }
+        idx = 12
     else:
-        raise ValueError("El fondo debe ser 'lin' o 'cuad'")
+        raise ValueError("Fondo no soportado, el fondo debe ser 'lin' o 'cuad'")
 
     # Empaquetado de elementos (común a ambos)
     idx = idx_start_elements
@@ -409,6 +453,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
