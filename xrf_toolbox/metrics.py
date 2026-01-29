@@ -524,3 +524,25 @@ def exportar_reporte_pdf(E, I, I_fit, popt, elementos, nombre_muestra="Muestra",
         ax5.text(0.1, 0.95, txt_o, fontsize=10, family='monospace', va='top'); pdf.savefig(fig5); plt.close(fig5)
     
     print(f"✅ Reporte final generado: {archivo}")
+
+def check_resolution_health(params, config):
+    """Compara la resolución ajustada contra la nominal del equipo."""
+    E_mn = 5.895 # Mn Ka1 en keV
+    
+    # Calculamos sigma en la línea del Mn
+    s_mn = np.sqrt(params['noise']**2 + params['fano'] * params['epsilon'] * E_mn)
+    
+    fwhm_ev = (s_mn * 2.355) * 1000
+    nominal = config.res_mn_ka
+    diff = fwhm_ev - nominal
+    
+    print("-" * 40)
+    print(f"ESTADO DEL DETECTOR ({config.name})")
+    print(f"Resolución Nominal: {nominal:.1f} eV")
+    print(f"Resolución Ajustada: {fwhm_ev:.1f} eV")
+    
+    if diff > 15:
+        print(f"ALERTA: Desviación de +{diff:.1f} eV detectada.")
+    else:
+        print("Estado: Óptimo.")
+    print("-" * 40)
