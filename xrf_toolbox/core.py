@@ -170,8 +170,17 @@ def get_compton_energy(E0, angle_deg):
     angle_rad = np.radians(angle_deg)
     return E0 / (1 + (E0 / m_e_c2) * (1 - np.cos(angle_rad)))
 
+def get_efficiency(energy, config):
+        # Be window
+        mu_be = xl.CS_Total(4, energy)
+        t_be = np.exp(-mu_be * 1.848 * (config.win_thick * 1e-4))
+        # Si detector
+        mu_si = xl.CS_Photo(14, energy)
+        a_si = 1 - np.exp(-mu_si * 2.33 * (config.det_thick * 0.1))
+        return t_be * a_si
+
 # Modelo
-def FRX_model_sdd_general(E_raw, params, config=None):
+def FRX_model_sdd_general(E_raw, params, config):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
@@ -223,7 +232,7 @@ def FRX_model_sdd_general(E_raw, params, config=None):
                 E0,
                 sigma,
                 gamma
-            )
+            ) * get_efficiency(E0, config)
 
     # --- PICOS DE DISPERSIÓN ---
     # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
@@ -247,14 +256,14 @@ def FRX_model_sdd_general(E_raw, params, config=None):
     
         if a_ray > 0:
             s_ray = sigma_E(E_tube, noise, fano, epsilon)
-            spectrum += voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube)
+            spectrum += voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube) * get_efficiency(E_tube, config)
     
         if a_com > 0:
-            E_com = get_compton_energy(E_tube, config["geometry_angle"])
+            E_com = get_compton_energy(E_tube, config.angle)
             s_com = sigma_E(E_com, noise, fano, epsilon)
             # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
             doppler = 0.005 if fam == "K" else 0.002
-            spectrum += voigt_peak(E, a_com * ratio, E_com, s_com, gamma_tube + doppler)
+            spectrum += voigt_peak(E, a_com * ratio, E_com, s_com, gamma_tube + doppler) * get_efficiency(E_com, config)
 
    # --- FONDO DINÁMICO ---
     bkg_coeffs = params["background"]
@@ -312,6 +321,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
