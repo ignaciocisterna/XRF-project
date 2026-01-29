@@ -1,0 +1,25 @@
+{
+    "name": "S2 PICOFOX 200",
+    "anode": "Mo",
+    "geometry": {
+        "angle_deg": 90.0,
+        "path": {
+          "atmosphere": "air",
+          "distance_mm": 5.00
+        }
+    },
+    "detector": {
+        "material": "Si",
+        "thickness_mm": 0.45,
+        "active_area_mm2": 30.0,
+        "fano_default": 0.115,
+        "noise_default_kev": 0.065,
+        "epsilon_kev": 0.00365,
+        "resolution_mn_ka_ev": 149.0
+    },
+    "window": {
+        "material": "Be",
+        "thickness_um": 60.0
+    }
+
+}
