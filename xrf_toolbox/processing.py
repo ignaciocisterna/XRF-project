@@ -194,6 +194,34 @@ def generar_mascara_roi(E, elementos, margen=0.4, borde=0.1):
             continue
     return mask
 
+def estimate_tau_pileup(counts, T_real, T_live):
+    """
+    Estima el tiempo de resolución (tau) del sistema a partir del espectro.
+    
+    counts: Array o lista con las cuentas por canal.
+    T_real: Tiempo de reloj (s) - Tiempo transcurrido total.
+    T_live: Tiempo de vida (s) - Tiempo que el detector estuvo disponible.
+    
+    Retorna:
+    tau (float): Tiempo de resolución estimado en segundos.
+    """
+    # 1. Integración del área total (N total de pulsos procesados)
+    n_total = np.sum(counts)
+    
+    # 2. Validación de tiempos
+    if T_real <= T_live:
+        # Esto ocurre si no hay tiempo muerto o los metadatos están mal
+        return 0.0
+    
+    if n_total <= 0:
+        return 0.0
+    
+    # 3. Cálculo de tau
+    # Basado en el modelo de tiempo muerto: T_dead = T_real - T_live
+    # El tiempo muerto por pulso es el tiempo muerto total entre el total de eventos
+    tau = (T_real - T_live) / n_total
+    
+    return tau
 
 
 
