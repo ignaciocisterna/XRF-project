@@ -12,16 +12,23 @@ import threading
 from . import core as core
 from . import processing as prc
 from . import metrics as mtr
+from .config.manager import InstrumentConfig
 
 #------------------------------------------------------------------------------#
 
 class XRFDeconv:
-    def __init__(self, energy, counts, name="Muestra", fondo="lin"):
+    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="S2 PICOFOX 200"):
         self.E_raw = energy
         self.I_raw = counts
         self.name = name
         self.fondo = fondo
         self.offset = 6 if fondo == "lin" else 7
+
+        self.config = InstrumentConfig.load(instrument)
+        res = self.config.get_resolution_params()
+        self.noise_init = res["noise"]
+        self.fano_init = res["fano"]
+        self.epsilon_init = res["epsilon"]
         
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
@@ -156,7 +163,7 @@ class XRFDeconv:
         def frx_wrapper(E_val, *p_free):
             p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
             params = core.pack_params(p_full, self.elements, fondo=self.fondo)
-            return core.FRX_model_sdd_general(E_val, params)
+            return core.FRX_model_sdd_general(E_val, params, config=self.config)
         
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
@@ -307,6 +314,7 @@ class XRFDeconv:
                                     nombre_muestra=self.name, 
 
                                     archivo=fname, fondo=self.fondo)
+
 
 
 
