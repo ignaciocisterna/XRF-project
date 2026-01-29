@@ -407,8 +407,7 @@ def pack_params(p, elements, fondo="lin"):
     params = {
         "noise": p[0], "fano": p[1], "epsilon": p[2],
         "tau_pileup": p[3],
-        "live_time": p[4],
-        "elements": {}
+        "live_time": p[4]
     }
 
     if fondo == "lin":
@@ -429,6 +428,7 @@ def pack_params(p, elements, fondo="lin"):
         raise ValueError("Fondo no soportado, el fondo debe ser 'lin' o 'cuad'")
 
     # Empaquetado de elementos (común a ambos)
+    params["elements"] = {}
     idx = idx_start_elements
     for elem in elements:
         params["elements"][elem] = {
@@ -453,6 +453,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
