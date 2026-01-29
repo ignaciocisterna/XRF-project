@@ -17,7 +17,8 @@ from .config.manager import InstrumentConfig
 #------------------------------------------------------------------------------#
 
 class XRFDeconv:
-    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="S2 PICOFOX 200"):
+    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="S2 PICOFOX 200",
+                t_real=None, t_live=None, ajustar_tau=None):
         self.E_raw = energy
         self.I_raw = counts
         self.name = name
@@ -31,10 +32,19 @@ class XRFDeconv:
         self.epsilon_init = res["epsilon"]
 
         # Tiempos y estimación de Tau
-        self.t_real = t_real if t_real else 1.0
-        self.t_live = t_live if t_live else 1.0
-        # Estimamos tau inicial usando la nueva función de processing
-        self.tau_init = prc.estimate_tau_pileup(counts, self.t_real, self.t_live)
+        self.t_real = t_real 
+        self.t_live = t_live 
+        # Si no hay tiempos, calculamos un tau inicial de 0 o uno genérico
+        # y forzamos que se ajuste porque no tenemos info real.
+        if t_real and t_live:
+            self.tau_init = prc.estimate_tau_pileup(counts, t_real, t_live)
+            # Si el usuario no especificó nada, no lo ajustamos (usamos el físico)
+            self.free_tau = ajustar_tau if ajustar_tau is not None else False
+        else:
+            self.tau_init = 1e-6 # Valor semilla genérico
+            self.t_live = 1.0    # Evitar división por cero
+            # Si no hay info, es obligatorio ajustarlo para que el modelo no falle
+            self.free_tau = True
         
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
@@ -329,6 +339,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
