@@ -161,6 +161,15 @@ def is_excitable_Mo(Z, family):
     # L y M son excitables con Mo
     return True
 
+def get_compton_energy(E0, angle_deg):
+    """
+    E0: Energía incidente en keV
+    angle_deg: Ángulo de dispersión (90° típico en TXRF)
+    """
+    m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
+    angle_rad = np.radians(angle_deg)
+    return E0 / (1 + (E0 / m_e_c2) * (1 - np.cos(angle_rad)))
+
 # Modelo
 def FRX_model_sdd_general(E_raw, params, config=None):
     """
@@ -173,7 +182,6 @@ def FRX_model_sdd_general(E_raw, params, config=None):
     offset = params.get("offset_corr", 0.0)
     E = energy_corr(E_raw, gain, offset)
     
-    #gamma = 0.02  # keV, típico SDD (corroborar)
     noise, fano, epsilon = params["noise"], params["fano"], params["epsilon"]
 
     spectrum = np.zeros_like(E)
@@ -217,12 +225,36 @@ def FRX_model_sdd_general(E_raw, params, config=None):
                 gamma
             )
 
-    # Picos de Dispersión (Rayleigh y Compton)
-    # Rayleigh: Elástico 
-    # Compton: Inelástico (depende del ángulo del detector)
-    area_ray, area_com = params.get("scat_areas", (0, 0))
-    spectrum += voigt_peak(E, area_ray, 17.44, sigma, gamma) # Rayleigh
-    spectrum += voigt_peak(E, area_com, 17.10, sigma, gamma) # Compton (ajustable)
+    # --- PICOS DE DISPERSIÓN ---
+    # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
+    
+    # Obtenemos info completa del ánodo (K y L)
+    tube_info = get_Xray_info(config["anode"], families=("K", "L"))
+    
+    # Extraemos las áreas de dispersión del diccionario params
+    # Ahora esperamos: scat_ray_K, scat_com_K, scat_ray_L, scat_com_L
+    scat_areas = params.get("scat_areas", {}) 
+    
+    for line_name, data in tube_info.items():
+        E_tube = data["energy"]
+        ratio = data["ratio"]
+        gamma_tube = data["gamma"]
+        fam = line_family(line_name) # "K" o "L"
+    
+        # Obtenemos el área base para esta familia (si no existe, 0)
+        a_ray = scat_areas.get(f"ray_{fam}", 0.0)
+        a_com = scat_areas.get(f"com_{fam}", 0.0)
+    
+        if a_ray > 0:
+            s_ray = sigma_E(E_tube, noise, fano, epsilon)
+            spectrum += voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube)
+    
+        if a_com > 0:
+            E_com = get_compton_energy(E_tube, config["geometry_angle"])
+            s_com = sigma_E(E_com, noise, fano, epsilon)
+            # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
+            doppler = 0.005 if fam == "K" else 0.002
+            spectrum += voigt_peak(E, a_com * ratio, E_com, s_com, gamma_tube + doppler)
 
    # --- FONDO DINÁMICO ---
     bkg_coeffs = params["background"]
@@ -280,6 +312,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
