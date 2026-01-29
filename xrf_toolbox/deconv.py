@@ -315,6 +315,14 @@ class XRFDeconv:
 
                                     archivo=fname, fondo=self.fondo)
 
+#------------------------------------------------------------------------------#
+
+    def run_resolution_check(self):
+        """Compara la resolución ajustada contra la nominal del equipo.
+           Aplicar idealmente a ajuste completo.
+        """
+        params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+        mtr.check_resolution_health(params, self.config)
 
 
 
