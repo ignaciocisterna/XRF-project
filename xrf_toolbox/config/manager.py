@@ -29,7 +29,7 @@ class InstrumentConfig:
         # --- Ventana ---
         win = data.get("window", {})
         self.win_material = win.get("material", "Be")
-        self.win_thick = win.get("thickness_um", 60.0)
+        self.win_thick = win.get("thickness_um", 100.0)
 
     @classmethod
     def load(cls, instrument_name):
@@ -47,3 +47,4 @@ class InstrumentConfig:
     def get_resolution_p0(self):
         """Devuelve el trío de resolución para p0: [noise, fano, epsilon]"""
         return [self.noise, self.fano, self.epsilon]
+
