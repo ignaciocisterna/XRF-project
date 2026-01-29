@@ -143,23 +143,96 @@ def get_compton_energy(E0, angle_deg):
 
 # Eficiencia del detector
 def get_efficiency(energy, config):
-        # Be window
-        mu_be = xl.CS_Total(4, energy)
-        t_be = np.exp(-mu_be * 1.848 * (config.win_thick * 1e-4))
-        # Si detector
-        mu_si = xl.CS_Photo(14, energy)
-        a_si = 1 - np.exp(-mu_si * 2.33 * (config.det_thick * 0.1))
-        return t_be * a_si
+    """
+    Calcula la eficiencia intrínseca del detector usando datos de config.
+    """
+    # Densidades (g/cm3)
+    rho_be = xl.ElementDensity(4)
+    rho_si = xl.ElementDensity(14)
+    
+    # Espesores desde config
+    x_be = config.win_thick * 1e-4  # um a cm
+    x_si = config.det_thick * 1e-1  # mm a cm
+    # Si no existe dead_layer en el JSON, usamos 0.05 um por defecto
+    x_dead = getattr(config, 'dead_layer_um', 0.05) * 1e-4 
+    
+    # 1. Transmisión ventana Be
+    mu_be = xl.CS_Total(4, E) 
+    trans_be = np.exp(-mu_be * rho_be * x_be)
+    
+    # 2. Transmisión/Absorción en Si
+    mu_si = xl.CS_Total(14, E)
+    # Transmisión a través de la capa muerta
+    trans_dead = np.exp(-mu_si * rho_si * x_dead)
+    # Absorción en el volumen activo
+    abs_si = 1.0 - np.exp(-mu_si * rho_si * x_si)
+    
+    return trans_be * trans_dead * abs_si
+
+def get_escape_ratio(E0):
+    """
+    Calcula la probabilidad de escape de Si Ka usando el modelo de Reed.
+    Todo se obtiene dinámicamente de xraylib.
+    """
+    Z_si = 14
+    edge_si = xl.EdgeEnergy(Z_si, xl.K_SHELL)
+    
+    if E0 < edge_si:
+        return 0.0
+    
+    # Energías y constantes
+    E_si = xl.LineEnergy(Z_si, xl.KA1_LINE)
+    omega_k = xl.FluorYield(Z_si, xl.K_SHELL)
+    jump_k = xl.JumpFactor(Z_si, xl.K_SHELL)
+    
+    # Probabilidad de fotoabsorción en la capa K
+    r_k = (jump_k - 1) / jump_k
+    
+    # Coeficientes de atenuación masica (Total es buena aprox para CS_Photo en Si)
+    mu_inc = xl.CS_Total(Z_si, E0)
+    mu_si = xl.CS_Total(Z_si, E_si)
+    
+    # Modelo de Reed: 0.5 * omega * r * [1 - (mu_det/mu_inc) * ln(1 + mu_inc/mu_det)]
+    ratio = 0.5 * omega_k * r_k * (1 - (mu_si / mu_inc) * np.log(1 + mu_inc / mu_si))
+    
+    return max(0, ratio)
 
 # --- MODELO DE ESPECTRO ---
 
-# Perfil de los peaks
+# Perfil de los peaks elementales y dispersión de Rayleigh
 def voigt_peak(E, area, E0, sigma, gamma):
     """
     area : área total del pico
     gamma: componente Lorentziana (cola instrumental)
     """
     return area * voigt_profile(E - E0, sigma, gamma)
+
+def get_doppler_width(E_inc):
+    """
+    Calcula una sigma de Doppler aproximada.
+    Para TXRF con muestras ligeras, el ensanchamiento es ~0.3% de la E_inc.
+    """
+    # Constante empírica para un ajuste balanceado (puede requerir ajuste para muestras sólidas)
+    cte_ensanchamiento = 0.0028    
+    return E_inc * cte_ensanchamiento  
+
+# Perfil de los peaks de dispersión de Compton
+def compton_peak(E, area, E_com, E_inc, sigma_inst):
+    """
+    E: Vector de energías.
+    E_com: Centro del pico Compton.
+    E_inc: Energía original del fotón del ánodo.
+    sigma_inst: Resolución instrumental (sigma_E).
+    """
+    # Calcular el ensanchamiento de Doppler
+    doppler_width = get_doppler_width(E_inc)
+    
+    # La sigma total es la suma cuadrática de la resolución y el Doppler
+    sigma_total = np.sqrt(sigma_inst**2 + doppler_width**2)
+    
+    # Usamos una Gaussiana (o Voigt con gamma muy pequeña)
+    # El perfil Compton tiende a ser más ancho que el Rayleigh
+    return area * voigt_profile(E - E_com, sigma_total, 0.001)
 
 
 # Identificador de familias de señal
@@ -173,18 +246,25 @@ def line_family(line_name):
     return None
 
 # Identificador de excitabilidad
-def is_excitable_Mo(Z, family):
+def is_excitable(Z, family, config):
     """
-    Fuente: Mo Kα ≈ 17.44 keV
+    Chequea si el ánodo del equipo puede excitar una familia específica.
+    Usa la línea Ka1 del ánodo como referencia de energía de excitación.
     """
-    if family == "K":
-        try:
-            return xl.EdgeEnergy(Z, xl.K_SHELL) < 17.44
-        except ValueError:
-            return False
-
-    # L y M son excitables con Mo
-    return True
+    # 1. Obtener energía de la línea Ka1 del ánodo
+    Z_anode = xl.SymbolToAtomicNumber(config.anode)
+    E_excit = xl.LineEnergy(Z_anode, xl.KA1_LINE)
+    
+    # 2. Mapeo de bordes de absorción principales
+    SHELLS = {"K": xl.K_SHELL, "L": xl.L3_SHELL, "M": xl.M5_SHELL}
+    
+    try:
+        if family in SHELLS:
+            edge = xl.EdgeEnergy(Z, SHELLS[family])
+            return edge < E_excit
+        return False
+    except ValueError:
+        return False
 
 # Modelo
 def FRX_model_sdd_general(E_raw, params, config):
@@ -225,7 +305,7 @@ def FRX_model_sdd_general(E_raw, params, config):
                 continue
 
             # Excitación por Mo
-            if not is_excitable_Mo(Z, fam):
+            if not is_excitable(Z, fam, config):
                 continue
 
             # Solo líneas dentro del rango experimental
@@ -245,7 +325,7 @@ def FRX_model_sdd_general(E_raw, params, config):
     # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
     
     # Obtenemos info completa del ánodo (K y L)
-    tube_info = get_Xray_info(config["anode"], families=("K", "L"))
+    tube_info = get_Xray_info(config.anode, families=("K", "L"))
     
     # Extraemos las áreas de dispersión del diccionario params
     # Ahora esperamos: scat_ray_K, scat_com_K, scat_ray_L, scat_com_L
@@ -269,8 +349,7 @@ def FRX_model_sdd_general(E_raw, params, config):
             E_com = get_compton_energy(E_tube, config.angle)
             s_com = sigma_E(E_com, noise, fano, epsilon)
             # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
-            doppler = 0.005 if fam == "K" else 0.002
-            spectrum += voigt_peak(E, a_com * ratio, E_com, s_com, gamma_tube + doppler) * get_efficiency(E_com, config)
+            spectrum += compton_peak(E, a_com * ratio, E_com, E_tube, s_com) * get_efficiency(E_com, config)
 
    # --- FONDO DINÁMICO ---
     bkg_coeffs = params["background"]
@@ -301,7 +380,7 @@ def pack_params(p, elements, fondo="lin"):
     elif fondo == "cuad":
         params["background"] = (p[3], p[4], p[5]) # c0, c1, c2
         params["scat_areas"] = {"ray_K": p[6], "com_K": p[7], "ray_L": p[8], "com_L": p[9]}    # Rayleigh, Compton
-        idx_start_elements = 8
+        idx_start_elements = 10
     else:
         raise ValueError("El fondo debe ser 'lin' o 'cuad'")
 
@@ -330,6 +409,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
