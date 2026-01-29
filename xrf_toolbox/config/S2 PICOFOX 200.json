@@ -19,7 +19,8 @@
     },
     "window": {
         "material": "Be",
-        "thickness_um": 60.0
+        "thickness_um": 100.0
     }
 
 }
+
