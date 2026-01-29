@@ -99,6 +99,8 @@ def get_Xray_info(symb, families=("K", "L", "M")):
 
     return info
 
+# --- FÍSICA Y RESOLUCIÓN ---
+
 # Correción de ganacia y deriva energéticas
 def energy_corr(E, gain, offset):
     return E * gain + offset
@@ -129,6 +131,28 @@ def fwhm_SNIP(E, gamma=1.2):
     b = 0.00252   # Datos de S2 PICOFOX
     return gamma * np.sqrt(a + b*E)
 
+# Energía de los peaks de dispersión Compton
+def get_compton_energy(E0, angle_deg):
+    """
+    E0: Energía incidente en keV
+    angle_deg: Ángulo de dispersión (90° típico en TXRF)
+    """
+    m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
+    angle_rad = np.radians(angle_deg)
+    return E0 / (1 + (E0 / m_e_c2) * (1 - np.cos(angle_rad)))
+
+# Eficiencia del detector
+def get_efficiency(energy, config):
+        # Be window
+        mu_be = xl.CS_Total(4, energy)
+        t_be = np.exp(-mu_be * 1.848 * (config.win_thick * 1e-4))
+        # Si detector
+        mu_si = xl.CS_Photo(14, energy)
+        a_si = 1 - np.exp(-mu_si * 2.33 * (config.det_thick * 0.1))
+        return t_be * a_si
+
+# --- MODELO DE ESPECTRO ---
+
 # Perfil de los peaks
 def voigt_peak(E, area, E0, sigma, gamma):
     """
@@ -136,6 +160,7 @@ def voigt_peak(E, area, E0, sigma, gamma):
     gamma: componente Lorentziana (cola instrumental)
     """
     return area * voigt_profile(E - E0, sigma, gamma)
+
 
 # Identificador de familias de señal
 def line_family(line_name):
@@ -160,24 +185,6 @@ def is_excitable_Mo(Z, family):
 
     # L y M son excitables con Mo
     return True
-
-def get_compton_energy(E0, angle_deg):
-    """
-    E0: Energía incidente en keV
-    angle_deg: Ángulo de dispersión (90° típico en TXRF)
-    """
-    m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
-    angle_rad = np.radians(angle_deg)
-    return E0 / (1 + (E0 / m_e_c2) * (1 - np.cos(angle_rad)))
-
-def get_efficiency(energy, config):
-        # Be window
-        mu_be = xl.CS_Total(4, energy)
-        t_be = np.exp(-mu_be * 1.848 * (config.win_thick * 1e-4))
-        # Si detector
-        mu_si = xl.CS_Photo(14, energy)
-        a_si = 1 - np.exp(-mu_si * 2.33 * (config.det_thick * 0.1))
-        return t_be * a_si
 
 # Modelo
 def FRX_model_sdd_general(E_raw, params, config):
@@ -208,7 +215,6 @@ def FRX_model_sdd_general(E_raw, params, config):
             E0 = line_data["energy"]
             r  = line_data["ratio"]
             gamma = line_data["gamma"]
-            sigma = sigma_E(E0, noise, fano, epsilon)
 
             fam = line_family(line)
             if fam is None:
@@ -226,6 +232,7 @@ def FRX_model_sdd_general(E_raw, params, config):
             if E0 < E.min() or E0 > E.max():
                 continue
 
+            sigma = sigma_E(E0, noise, fano, epsilon)
             spectrum += voigt_peak(
                 E,
                 A * r,
@@ -273,6 +280,8 @@ def FRX_model_sdd_general(E_raw, params, config):
     # spectrum es la suma de picos calculada previamente
     return spectrum + background
 
+# --- TRATAMIENTO DE PARÁMETROS ---
+
 # Vectorización de parámetros
 def pack_params(p, elements, fondo="lin"):
     """
@@ -287,11 +296,11 @@ def pack_params(p, elements, fondo="lin"):
 
     if fondo == "lin":
         params["background"] = (p[3], p[4])      # c0, c1
-        params["scat_areas"] = (p[5], p[6])      # Rayleigh, Compton
-        idx_start_elements = 7
+        params["scat_areas"] = {"ray_K": p[5], "com_K": p[6], "ray_L": p[7], "com_L": p[8]}    # Rayleigh, Compton
+        idx_start_elements = 9
     elif fondo == "cuad":
         params["background"] = (p[3], p[4], p[5]) # c0, c1, c2
-        params["scat_areas"] = (p[6], p[7])      # Rayleigh, Compton
+        params["scat_areas"] = {"ray_K": p[6], "com_K": p[7], "ray_L": p[8], "com_L": p[9]}    # Rayleigh, Compton
         idx_start_elements = 8
     else:
         raise ValueError("El fondo debe ser 'lin' o 'cuad'")
@@ -321,6 +330,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
