@@ -22,13 +22,19 @@ class XRFDeconv:
         self.I_raw = counts
         self.name = name
         self.fondo = fondo
-        self.offset = 6 if fondo == "lin" else 7
+        self.offset = 11 if fondo == "lin" else 12
 
         self.config = InstrumentConfig.load(instrument)
         res = self.config.get_resolution_params()
         self.noise_init = res["noise"]
         self.fano_init = res["fano"]
         self.epsilon_init = res["epsilon"]
+
+        # Tiempos y estimación de Tau
+        self.t_real = t_real if t_real else 1.0
+        self.t_live = t_live if t_live else 1.0
+        # Estimamos tau inicial usando la nueva función de processing
+        self.tau_init = prc.estimate_tau_pileup(counts, self.t_real, self.t_live)
         
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
@@ -323,6 +329,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
