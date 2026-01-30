@@ -154,7 +154,7 @@ def get_efficiency(energy, config):
     x_be = config.win_thick * 1e-4  # um a cm
     x_si = config.det_thick * 1e-1  # mm a cm
     # Si no existe dead_layer en el JSON, usamos 0.05 um por defecto
-    x_dead = getattr(config, 'dead_layer_um', 0.05) * 1e-4 
+    x_dead = config.dead_layer * 1e-4 
     
     # 1. Transmisión ventana Be
     mu_be = xl.CS_Total(4, E) 
@@ -453,6 +453,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
