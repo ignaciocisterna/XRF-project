@@ -5,7 +5,7 @@
         "angle_deg": 90.0,
         "path": {
           "atmosphere": "air",
-          "distance_mm": None
+          "distance_mm": null
         }
     },
     "detector": {
@@ -16,7 +16,7 @@
         "noise_default_kev": 0.065,
         "epsilon_kev": 0.00365,
         "resolution_mn_ka_ev": 149.0,
-        "dead_layer_um": None
+        "dead_layer_um": null
     },
     "window": {
         "material": "Be",
@@ -24,5 +24,6 @@
     }
 
 }
+
 
 
