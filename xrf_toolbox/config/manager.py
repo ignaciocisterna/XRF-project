@@ -13,7 +13,7 @@ class InstrumentConfig:
         self.angle = geom.get("angle_deg", 90.0)
         self.atm = path.get("atmosphere", "air")
         self.path_dist = path.get("distance_mm")
-        pd = det.get("distance_mm")
+        pd = path.get("distance_mm")
         self.path_dist = 5.0 if pd is None else pd
         
         # --- Detector y Física de Resolución ---
@@ -51,5 +51,6 @@ class InstrumentConfig:
     def get_resolution_p0(self):
         """Devuelve el trío de resolución para p0: [noise, fano, epsilon]"""
         return [self.noise, self.fano, self.epsilon]
+
 
 
