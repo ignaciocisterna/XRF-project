@@ -89,7 +89,7 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
 
 def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
-               fondo="lin",show=True):    
+                       fondo="lin",show=True):    
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
@@ -141,14 +141,45 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                                 })
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
-    scat = final_params.get("scat", {})
-    area_ray = scat.get("area_ray", 0)
-    area_com = scat.get("area_com", 0)
+    scat = final_params.get("scat_areas", {})
+    tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
+    target_lines = ["Ka1", "La1"]
+    tube_info = {fam: {k: v for k, v in lines.items() if k in target_lines} 
+                 for fam, lines in tube_info.items()}
+    scat_peaks = []
+                   
+    for f, lines in tube_info.items():
+        for line_name, data in lines.items():
+            E_tube = data["energy"]
+            E_com = core.get_compton_energy(E_tube, config.angle)
+            fam = core.line_family(line_name)
+            
+            ray_tag = {'e': E_tube, 'name': f"Ray-{fam}", 'area': scat.get(f"ray_{fam}", 0)}
+            scat_peaks.append(ray_tag)
+            com_tag = {'e': E_com, 'name': f"Com-{fam}", 'area': scat.get(f"com_{fam}", 0)}
+            scat_peaks.append(com_tag)
 
-    if area_ray > umbral_area_familia:
-        etiquetas_info.append({'e': 17.44, 'name': "Rayleigh\npeak"})
-    if area_com > umbral_area_familia:
-        etiquetas_info.append({'e': 17.10, 'name': "Compton\npeak"})
+    for s_peak in scat_peaks:
+        if s_peak['area'] > umbral_area_familia and E.min() < s_peak['e'] < E.max():
+            etiquetas_info.append({'e': s_peak['e'], 'name': f"Scat\n{s_peak['name']}"})
+
+    # --- INDICADORES DE ARTEFACTOS (ESCAPE Y SUMA) ---
+    # Solo graficamos si el pico principal es muy fuerte (> 20% del max global)
+    for elem, data in final_params["elements"].items():
+        area_k = data.get("area_K", 0)
+        if area_k > (np.max(I) * 0.2): 
+            e_ka = xl.LineEnergy(xl.SymbolToAtomicNumber(elem), xl.KA1_LINE)
+            
+            # Escape (Si Ka - 1.74 keV)
+            e_esc = e_ka - 1.74
+            if E.min() < e_esc < E.max():
+                etiquetas_info.append({'e': e_esc, 'name': f"esc-{elem}", 'type': 'art'})
+            
+            # Suma (Ka + Ka) - Solo si tau > 0
+            if final_params.get("tau_pileup", 0) > 0:
+                e_sum = e_ka * 2
+                if E.min() < e_sum < E.max():
+                    etiquetas_info.append({'e': e_sum, 'name': f"sum-{elem}", 'type': 'art'})
 
     # --- RENDERIZADO DE ETIQUETAS ---
     etiquetas_info.sort(key=lambda x: x['e'])
@@ -324,7 +355,57 @@ def detectar_elementos_omitidos(E, I, I_fit, umbral_sigma=10, output=True, verbo
     
     return peaks if output else None
 
-def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, fondo="lin"):
+def check_resolution_health(params, config):
+    """Compara la resolución ajustada contra la nominal y detecta saturación de bounds."""
+    E_mn = 5.895 # Mn Ka1 en keV
+    
+    # 1. Cálculo de Resolución (FWHM)
+    # sigma = sqrt( noise^2 + F*epsilon*E )
+    s_mn = np.sqrt(params['noise']**2 + params['fano'] * params['epsilon'] * E_mn)
+    fwhm_ev = (s_mn * 2.355) * 1000
+    nominal = config.res_mn_ka
+    diff = fwhm_ev - nominal
+    
+    print("-" * 45)
+    print(f"DIAGNÓSTICO DEL DETECTOR: {config.name}")
+    print(f"  Resolución Nominal: {nominal:.1f} eV")
+    print(f"  Resolución Ajustada: {fwhm_ev:.1f} eV ({'+' if diff>0 else ''}{diff:.1f} eV)")
+    
+    # 2. Detección de Bounds (Salud del ajuste)
+    # Valores críticos definidos en deconv.py
+    alertas = []
+    if params['fano'] >= 0.19: alertas.append("FACTOR FANO AL LÍMITE (Posible sobre-ensanchamiento)")
+    if params['fano'] <= 0.06: alertas.append("FACTOR FANO MUY BAJO (Picos inusualmente delgados)")
+    if params['noise'] >= 0.029: alertas.append("RUIDO ELECTRÓNICO AL MÁXIMO (Fondo inestable)")
+    if params['epsilon'] >= 0.00375 or params['epsilon'] <= 0.00355:
+        alertas.append("EPSILON DESVIADO (Problema de calibración ADC)")
+
+    # 3. Impresión de Resultados
+    if not alertas:
+        if diff > 15:
+            print("  Estado: ⚠️ DEGRADADO (Pérdida de resolución significativa)")
+        else:
+            print("  Estado: ✅ ÓPTIMO")
+    else:
+        print("  Estado: ❌ CRÍTICO - ALERTAS DE AJUSTE:")
+        for a in alertas:
+            print(f"    - {a}")
+    print("-" * 45)
+
+    fig_h = plt.figure()
+    ax_graph = fig_h.add_axes([0.1, 0.1, 0.8, 0.4])
+    e_plot = np.linspace(1, 20, 100)
+    sig_plot = np.sqrt(final_params['noise']**2 + final_params['fano'] * final_params['epsilon'] * e_plot) * 2.355 * 1000
+    ax_graph.plot(e_plot, sig_plot, color='green', label='Curva de Resolución Fit')
+    sig_plot_nom = np.sqrt(config.noise**2 + config.fano * config.epsilon * e_plot) * 2.355 * 1000
+    ax_graph.plot(e_plot, sig_plot_nom, color='grey', label='Curva de Resolución Nominal', linestyle='--', alpha=0.5)
+    ax_graph.set_xlabel("Energía (keV)"); ax_graph.set_ylabel("FWHM (eV)"); ax_graph.grid(alpha=0.3)
+    ax_graph.set_title("Gráfico de función de resolución Sigma(E)")
+    ax_graph.legend()
+    ax_graph.plot(x, y)
+    plt.show()
+
+def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, fondo="lin", config=None):
     """
     Genera tabla de calidad por elemento y gráficos de diagnóstico de los peores ajustes.
     """
@@ -436,7 +517,12 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
 
     detectar_elementos_omitidos(E, I, I_fit, output=False)
 
-def exportar_reporte_pdf(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", archivo="Reporte_FRX.pdf", fondo="lin"):
+    if config:
+        params = core.pack_params(popt, elementos, fondo=fondo)
+        check_resolution_health(params, config)
+
+def exportar_reporte_pdf(E, I, I_fit, popt, elementos, config, nombre_muestra="Muestra", 
+                         archivo="Reporte_FRX.pdf", fondo="lin"):
     PAGE_SIZE = (11, 8.5)
     with PdfPages(archivo) as pdf:
         # --- PÁGINA 1: AJUSTE GLOBAL Y TABLA ---
@@ -522,27 +608,57 @@ def exportar_reporte_pdf(E, I, I_fit, popt, elementos, nombre_muestra="Muestra",
                 txt_o += f"{E[pks[i]]:<10.3f} | {prps['peak_heights'][i]:<12.1f}σ | {identificar_candidato(E[pks[i]])}\n"
         else: txt_o += "✅ Sin omisiones significativas."
         ax5.text(0.1, 0.95, txt_o, fontsize=10, family='monospace', va='top'); pdf.savefig(fig5); plt.close(fig5)
+
+        # --- PÁGINA 6: SALUD DEL DETECTOR ---
+        fig_h, ax_h = plt.subplots(figsize=PAGE_SIZE)
+        ax_h.axis('off')
+        
+        # Obtenemos los datos de salud
+        res_mn_nom = config.res_mn_ka
+        s_mn = np.sqrt(final_params['noise']**2 + final_params['fano'] * final_params['epsilon'] * 5.895)
+        res_mn_fit = (s_mn * 2.355) * 1000
+        
+        health_txt = (
+            f"CHEQUEO DE RESOLUCIÓN Y HARDWARE\n"
+            f"{'='*40}\n\n"
+            f"Instrumento: {config.name}\n"
+            f"Resolución Mn-Ka (Nominal): {res_mn_nom:.1f} eV\n"
+            f"Resolución Mn-Ka (Ajustada): {res_mn_fit:.1f} eV\n"
+            f"Desviación: {res_mn_fit - res_mn_nom:+.1f} eV\n\n"
+            f"PARÁMETROS FÍSICOS AJUSTADOS:\n"
+            f"{'-'*40}\n"
+            f"Ruido Electrónico (σ): {final_params['noise']*1000:.2f} eV\n"
+            f"Factor de Fano:        {final_params['fano']:.3f}\n"
+            f"Epsilon (eV/eh):       {final_params['epsilon']*1000:.1f} eV\n"
+            f"Tau Pile-up (s):       {final_params['tau_pileup']:.2e} s\n\n"
+        )
+        
+        # Lógica de semáforo
+        status = "ÓPTIMO"
+        if abs(res_mn_fit - res_mn_nom) > 15: status = "DEGRADADO"
+        if final_params['fano'] > 0.18 or final_params['noise'] > 0.025: status = "CRÍTICO (Revisar Bounds)"
+        
+        health_txt += f"ESTADO GENERAL: {status}"
+        
+        ax_h.text(0.1, 0.9, health_txt, fontsize=12, family='monospace', va='top')
+        
+        # Opcional: Un pequeño gráfico de la función de resolución Sigma(E)
+        ax_graph = fig_h.add_axes([0.1, 0.1, 0.8, 0.4])
+        e_plot = np.linspace(1, 20, 100)
+        
+        sig_plot = np.sqrt(final_params['noise']**2 + final_params['fano'] * final_params['epsilon'] * e_plot) * 2.355 * 1000
+        ax_graph.plot(e_plot, sig_plot, color='green', label='Curva de Resolución Fit')
+        
+        sig_plot_nom = np.sqrt(config.noise**2 + config.fano * config.epsilon * e_plot) * 2.355 * 1000
+        ax_graph.plot(e_plot, sig_plot_nom, color='grey', label='Curva de Resolución Nominal', linestyle='--', alpha=0.5)
+        
+        ax_graph.set_xlabel("Energía (keV)"); ax_graph.set_ylabel("FWHM (eV)"); ax_graph.grid(alpha=0.3)
+        ax_graph.set_title("Gráfico de función de resolución Sigma(E)")
+        ax_graph.legend()
+        
+        pdf.savefig(fig_h); plt.close(fig_h)
     
     print(f"✅ Reporte final generado: {archivo}")
 
-def check_resolution_health(params, config):
-    """Compara la resolución ajustada contra la nominal del equipo."""
-    E_mn = 5.895 # Mn Ka1 en keV
-    
-    # Calculamos sigma en la línea del Mn
-    s_mn = np.sqrt(params['noise']**2 + params['fano'] * params['epsilon'] * E_mn)
-    
-    fwhm_ev = (s_mn * 2.355) * 1000
-    nominal = config.res_mn_ka
-    diff = fwhm_ev - nominal
-    
-    print("-" * 40)
-    print(f"ESTADO DEL DETECTOR ({config.name})")
-    print(f"Resolución Nominal: {nominal:.1f} eV")
-    print(f"Resolución Ajustada: {fwhm_ev:.1f} eV")
-    
-    if diff > 15:
-        print(f"ALERTA: Desviación de +{diff:.1f} eV detectada.")
-    else:
-        print("Estado: Óptimo.")
-    print("-" * 40)
+
+        
