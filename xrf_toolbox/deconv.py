@@ -97,7 +97,7 @@ class XRFDeconv:
             
             # 1. Parte Global 
             # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 0, 1] # tau dependiente de free_tau
+            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
             # Fondo y Dispersión
             n_bkg = 2 if self.fondo == "lin" else 3
             mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
@@ -195,6 +195,9 @@ class XRFDeconv:
         
 
         # BOUNDS DINÁMICOS
+        # Identificamos los índices de los parámetros que SÍ son libres
+        indices_libres = [idx for idx, free in enumerate(free_mask) if free]
+
         lower, upper = [], []
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
@@ -203,7 +206,7 @@ class XRFDeconv:
         for i, val in enumerate(p0_free):
             # Encontrar a qué parámetro real corresponde este p0_free[i]
             # Esto es clave para aplicar límites físicos
-            p_idx = [idx for idx, free in enumerate(free_mask) if free][i]
+            p_idx = indices_libres[i]
             
             if p_idx == 0: # Noise
                 lower.append(0.0035); upper.append(0.012)
@@ -356,6 +359,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
