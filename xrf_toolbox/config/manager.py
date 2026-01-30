@@ -12,13 +12,17 @@ class InstrumentConfig:
         path = geom.get("path", {})
         self.angle = geom.get("angle_deg", 90.0)
         self.atm = path.get("atmosphere", "air")
-        self.path_dist = path.get("distance_mm", 5.0)
+        self.path_dist = path.get("distance_mm")
+        pd = det.get("distance_mm")
+        self.path_dist = 5.0 if pd is None else pd
         
         # --- Detector y Física de Resolución ---
         det = data.get("detector", {})
         self.det_material = det.get("material", "Si")
         self.det_thick = det.get("thickness_mm", 0.45)
         self.active_area = det.get("active_area_mm2", 30.0)
+        dl = det.get("dead_layer_um")
+        self.dead_layer = 0.05 if dl is None else dl
         
         # Valores para el ajuste (Semillas p0)
         self.noise = det.get("noise_default_kev", 0.065)
@@ -47,4 +51,5 @@ class InstrumentConfig:
     def get_resolution_p0(self):
         """Devuelve el trío de resolución para p0: [noise, fano, epsilon]"""
         return [self.noise, self.fano, self.epsilon]
+
 
