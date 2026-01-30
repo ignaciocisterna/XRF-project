@@ -406,24 +406,24 @@ def pack_params(p, elements, fondo="lin"):
     """
     params = {
         "noise": p[0], "fano": p[1], "epsilon": p[2],
-        "tau_pileup": p[3],
-        "live_time": p[4]
+        "tau_pileup": p[3], "live_time": p[4],
+        "gain_corr": p[5], "offset_corr": p[6]
     }
 
     if fondo == "lin":
-        params["background"] = (p[5], p[6])
+        params["background"] = (p[7], p[8])
         params["scat_areas"] = {
-            "ray_K": p[7], "com_K": p[8], 
-            "ray_L": p[9], "com_L": p[10]
+            "ray_K": p[9], "com_K": p[10], 
+            "ray_L": p[11], "com_L": p[12]
         }
-        idx = 11
+        idx = 13
     elif fondo == "cuad":
-        params["background"] = (p[5], p[6], p[7])
+        params["background"] = (p[7], p[8], p[9])
         params["scat_areas"] = {
-            "ray_K": p[8], "com_K": p[9], 
-            "ray_L": p[10], "com_L": p[11]
+            "ray_K": p[10], "com_K": p[11], 
+            "ray_L": p[12], "com_L": p[13]
         }
-        idx = 12
+        idx = 14
     else:
         raise ValueError("Fondo no soportado, el fondo debe ser 'lin' o 'cuad'")
 
@@ -453,6 +453,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
