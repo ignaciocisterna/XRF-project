@@ -41,10 +41,14 @@ class XRFDeconv:
             # Si el usuario no especificó nada, no lo ajustamos (usamos el físico)
             self.free_tau = ajustar_tau if ajustar_tau is not None else False
         else:
-            self.tau_init = 1e-6 # Valor semilla genérico
+            # Si no hay datos y el usuario pide NO ajustar, tau es 0 -> Peak Suma desactivados
+            if ajustar_tau:
+                self.tau_init = 1e-6 # Semilla pequeña para que el solver empiece a buscar
+                self.free_tau = True
+            else:
+                self.tau_init = 0.0  # <--- ESTO OMITE LOS PICOS DE SUMA
+                self.free_tau = False
             self.t_live = 1.0    # Evitar división por cero
-            # Si no hay info, es obligatorio ajustarlo para que el modelo no falle
-            self.free_tau = True
         
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
@@ -85,14 +89,19 @@ class XRFDeconv:
 
     def get_mask(self, etapa):
             """
-            etapa: "K", "L", "M" o "global"
+            Genera la máscara de parámetros libres.
+            Estructura p: [noise, fano, eps, tau, live, c0, c1, (c2), RK, CK, RL, CL, Area1_K, Area1_L...]
+            Etapa: "K", "L", "M" o "global"
             """
             n_elem = len(self.elements)
             
-            # 1. Parte Global (Siempre libre en las etapas iniciales)
-            # Creamos una lista de '1's según el tamaño del offset
-            mask_base = [1] * self.offset 
-            
+            # 1. Parte Global 
+            # Por defecto: noise(1), fano(1), eps(1), tau(free_tau), live(0), bkg(1,1), scat(1,1,1,1)
+            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 0] # live_time siempre fijo y tau dependiente de free_tau
+            # Fondo y Dispersión
+            n_bkg = 2 if self.fondo == "lin" else 3
+            mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+        
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
             element_masks = []
         
@@ -124,19 +133,20 @@ class XRFDeconv:
             c0_init = np.min(self.bkg)
             c1_init = (self.bkg[-1] - self.bkg[0]) / (self.E[-1] - self.E[0])
 
-            rayleigh_init = max(self.I) * 2
-            compton_init = max(self.I) * 1
+            # Semillas de dispersión basadas en el máximo del espectro
+            max_counts = np.max(self.I)
+            p0 = [
+                self.noise_init, self.fano_init, self.epsilon_init,
+                self.tau_init, self.t_live,
+                c0_init, c1_init
+            ]
+            if self.fondo == "cuad": p0.append(0.0)
+            
+            # [Ray_K, Com_K, Ray_L, Com_L]
+            p0 += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
 
-            if self.fondo == "lin":
-                # a, b, c0, c1, Ray, Comp
-                p0 = [0.0057, 0.00252, c0_init, c1_init, rayleigh_init, compton_init]
-            else:
-                # a, b, c0, c1, c2, Ray, Comp
-                p0 = [0.0057, 0.00252, c0_init, c1_init, 0.0, rayleigh_init, compton_init]
-
-            if self.I_net is None: 
-                self.I_net = np.maximum(self.I - self.bkg, 0)
-                
+            # Inicializar áreas de elementos detectados
+            if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
             area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for _ in self.elements:
@@ -181,31 +191,33 @@ class XRFDeconv:
             params = core.pack_params(p_full, self.elements, fondo=self.fondo)
             return core.FRX_model_sdd_general(E_val, params, config=self.config)
         
+        
+
+        # BOUNDS DINÁMICOS
+        lower, upper = [], []
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
         techo_cuentas = np.max(self.I) * 1.5
-
-        A_LIMITS = (0.003, 0.015) 
-        B_LIMITS = (0.0005, 0.005)
         
-        lower_bounds = []
-        upper_bounds = []
+        for i, val in enumerate(p0_free):
+            # Encontrar a qué parámetro real corresponde este p0_free[i]
+            # Esto es clave para aplicar límites físicos
+            p_idx = [idx for idx, free in enumerate(free_mask) if free][i]
+            
+            if p_idx == 0: # Noise
+                lower.append(0.001); upper.append(0.02)
+            elif p_idx == 1: # Fano Factor
+                lower.append(0.05);  upper.append(0.20)  # Rango físico estricto
+            elif p_idx == 2: # Epsilon
+                lower.append(0.0035); upper.append(0.0038) # Casi fijo, pero con un mínimo margen
+            elif p_idx == 3: # Tau pileup
+                lower.append(0.0); upper.append(1e-5) # Máximo 10 microsegundos
+            elif p_idx < self.offset: # Resto de globales (bkg, scat)
+                lower.append(0.0); upper.append(np.inf)
+            else: # Áreas de elementos
+                lower.append(0.0); upper.append(techo_cuentas)
         
-        for i, p in enumerate(p0_free):
-            if i == 0: # Parámetro 'a'
-                lower_bounds.append(A_LIMITS[0])
-                upper_bounds.append(A_LIMITS[1])
-            elif i == 1: # Parámetro 'b'
-                lower_bounds.append(B_LIMITS[0])
-                upper_bounds.append(B_LIMITS[1])
-            elif i < self.offset: # El resto del fondo (c0, c1, c2, Ray, Comp)
-                lower_bounds.append(0.0)
-                upper_bounds.append(np.inf)
-            else: # Áreas de picos
-                lower_bounds.append(0.0) 
-                upper_bounds.append(techo_cuentas)
-        
-        bounds = (lower_bounds, upper_bounds)
+        bounds = (lower, upper)
 
         roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
@@ -339,6 +351,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
