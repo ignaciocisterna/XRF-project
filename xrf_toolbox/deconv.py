@@ -97,7 +97,7 @@ class XRFDeconv:
             
             # 1. Parte Global 
             # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
+            mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
             # Fondo y Dispersión
             n_bkg = 2 if self.fondo == "lin" else 3
             mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
@@ -359,6 +359,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
