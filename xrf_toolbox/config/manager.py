@@ -49,8 +49,13 @@ class InstrumentConfig:
             return cls(json.load(f))
 
     def get_resolution_params(self):
-        """Devuelve el trío de resolución para p0: [noise, fano, epsilon]"""
-        return [self.noise, self.fano, self.epsilon]
+        """Devuelve el trío de resolución para p0: noise, fano y epsilon"""
+       return {
+        "noise": self.noise,
+        "fano": self.fano,
+        "epsilon": self.epsilon
+    }
+
 
 
 
