@@ -23,7 +23,7 @@ class XRFDeconv:
         self.I_raw = counts
         self.name = name
         self.fondo = fondo
-        self.offset = 13 if fondo == "lin" else 14
+        self.offset = 12 if fondo == "lin" else 13
 
         self.config = InstrumentConfig.load(instrument)
         res = self.config.get_resolution_params()
@@ -90,14 +90,14 @@ class XRFDeconv:
     def get_mask(self, etapa):
             """
             Genera la máscara de parámetros libres.
-            Estructura p: [noise, fano, eps, tau, live, c0, c1, (c2), RK, CK, RL, CL, Area1_K, Area1_L...]
+            Estructura p: [noise, fano, eps, tau, c0, c1, (c2), RK, CK, RL, CL, Area1_K, Area1_L...]
             Etapa: "K", "L", "M" o "global"
             """
             n_elem = len(self.elements)
             
             # 1. Parte Global 
-            # Por defecto: noise, fano, eps, tau, live, gain, offset, bkg, scat
-            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 0, 1, 1] # live_time siempre fijo y tau dependiente de free_tau
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = mask_base = [1, 1, 1, (1 if self.free_tau else 0), 0, 1] # tau dependiente de free_tau
             # Fondo y Dispersión
             n_bkg = 2 if self.fondo == "lin" else 3
             mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
@@ -137,7 +137,7 @@ class XRFDeconv:
             max_counts = np.max(self.I)
             p0 = [
                 self.noise_init, self.fano_init, self.epsilon_init,
-                self.tau_init, self.t_live,
+                self.tau_init,
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
@@ -190,7 +190,7 @@ class XRFDeconv:
         def frx_wrapper(E_val, *p_free):
             p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
             params = core.pack_params(p_full, self.elements, fondo=self.fondo)
-            return core.FRX_model_sdd_general(E_val, params, config=self.config)
+            return core.FRX_model_sdd_general(E_val, params, self.t_live, config=self.config)
         
         
 
@@ -213,9 +213,9 @@ class XRFDeconv:
                 lower.append(0.0035); upper.append(0.0038) # Casi fijo, pero con un mínimo margen
             elif p_idx == 3: # Tau pileup
                 lower.append(0.0); upper.append(1e-5) # Máximo 10 microsegundos
-            elif p_idx == 5: # Gain Corr
+            elif p_idx == 4: # Gain Corr
                 lower.append(0.98);   upper.append(1.02) # +/- 2% ganancia
-            elif p_idx == 6: # Offset Corr
+            elif p_idx == 5: # Offset Corr
                 lower.append(-0.05);  upper.append(0.05) # +/- 50 eV shift
             elif p_idx < self.offset: # Resto de globales (bkg, scat)
                 lower.append(0.0); upper.append(np.inf)
@@ -356,6 +356,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
