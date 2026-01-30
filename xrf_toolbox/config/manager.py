@@ -50,11 +50,8 @@ class InstrumentConfig:
 
     def get_resolution_params(self):
         """Devuelve el trío de resolución para p0: noise, fano y epsilon"""
-       return {
-            "noise": self.noise,
-            "fano": self.fano,
-            "epsilon": self.epsilon
-        }
+       return {"noise": self.noise, "fano": self.fano, "epsilon": self.epsilon}
+
 
 
 
