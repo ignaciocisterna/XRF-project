@@ -428,7 +428,6 @@ def pack_params(p, elements, fondo="lin"):
 
     # Empaquetado de elementos (común a ambos)
     params["elements"] = {}
-    idx = idx_start_elements
     for elem in elements:
         params["elements"][elem] = {
             "area_K": p[idx],
@@ -452,6 +451,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
