@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xrf_toolbox"
-version = "1.0.2"
+version = "1.1.0"
 description = "Herramientas para de-convolución y análisis de espectros XRF"
 dependencies = [
     "numpy",
@@ -17,4 +17,5 @@ dependencies = [
 [tool.setuptools.packages.find]
 
 where = ["."]
+
 
