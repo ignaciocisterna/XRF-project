@@ -199,7 +199,7 @@ def get_escape_ratio(E0):
     return max(0, ratio)
 
 # Modificador de peak para añadir peak de escape y suma
-def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, config):
+def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, live_time, config):
     """
     Agrega picos de Escape y Suma a un espectro a partir de un pico principal.
     
@@ -217,9 +217,8 @@ def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, config):
         spectrum += voigt_peak(E, area * ratio_esc, E_esc, s_esc, gamma)
 
     # 2. PICO DE SUMA (Pile-up: E0 + E0)
-    # Obtenemos tau y live_time del diccionario de parámetros
+    # Obtenemos tau del diccionario de parámetros
     tau = params.get("tau_pileup", 0.0)
-    live_time = params.get("live_time", 1.0)
     
     if tau > 0 and area > 0:
         # Probabilidad de suma: R * tau, donde R es la tasa de cuentas (Area / T_live)
@@ -306,7 +305,7 @@ def is_excitable(Z, family, config):
         return False
 
 # Modelo
-def FRX_model_sdd_general(E_raw, params, config):
+def FRX_model_sdd_general(E_raw, params, live_time, config):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
@@ -357,7 +356,7 @@ def FRX_model_sdd_general(E_raw, params, config):
 
             # 2. Artefactos: Escape y Suma
             # Nota: Pasamos el área para que la función maneje los satélites
-            spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, config)
+            spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, live_time, config)
 
     # --- PICOS DE DISPERSIÓN ---
     # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
@@ -406,24 +405,24 @@ def pack_params(p, elements, fondo="lin"):
     """
     params = {
         "noise": p[0], "fano": p[1], "epsilon": p[2],
-        "tau_pileup": p[3], "live_time": p[4],
-        "gain_corr": p[5], "offset_corr": p[6]
+        "tau_pileup": p[3],
+        "gain_corr": p[4], "offset_corr": p[5]
     }
 
     if fondo == "lin":
-        params["background"] = (p[7], p[8])
+        params["background"] = (p[6], p[7])
+        params["scat_areas"] = {
+            "ray_K": p[8], "com_K": p[9], 
+            "ray_L": p[10], "com_L": p[11]
+        }
+        idx = 12
+    elif fondo == "cuad":
+        params["background"] = (p[6], p[7], p[8])
         params["scat_areas"] = {
             "ray_K": p[9], "com_K": p[10], 
             "ray_L": p[11], "com_L": p[12]
         }
         idx = 13
-    elif fondo == "cuad":
-        params["background"] = (p[7], p[8], p[9])
-        params["scat_areas"] = {
-            "ray_K": p[10], "com_K": p[11], 
-            "ray_L": p[12], "com_L": p[13]
-        }
-        idx = 14
     else:
         raise ValueError("Fondo no soportado, el fondo debe ser 'lin' o 'cuad'")
 
@@ -453,6 +452,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
