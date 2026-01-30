@@ -17,7 +17,7 @@ from .config.manager import InstrumentConfig
 #------------------------------------------------------------------------------#
 
 class XRFDeconv:
-    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="S2 PICOFOX 200",
+    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="s2 picofox 200",
                 t_real=None, t_live=None, ajustar_tau=None):
         self.E_raw = energy
         self.I_raw = counts
@@ -356,6 +356,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
