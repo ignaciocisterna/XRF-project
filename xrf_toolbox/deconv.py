@@ -356,7 +356,7 @@ class XRFDeconv:
         stop_event.set()
         t.join() 
         
-        self.p_dict = core.pack_params(self.p_actual, self.elements)
+        self.p_dict = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
 
 #------------------------------------------------------------------------------#
@@ -406,3 +406,4 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
