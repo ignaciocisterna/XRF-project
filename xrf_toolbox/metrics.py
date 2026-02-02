@@ -396,7 +396,7 @@ def check_resolution_health(params, config):
     fig_h = plt.figure()
     ax_graph = fig_h.add_axes([0.1, 0.1, 0.8, 0.4])
     e_plot = np.linspace(1, 20, 100)
-    sig_plot = np.sqrt(final_params['noise']**2 + final_params['fano'] * final_params['epsilon'] * e_plot) * 2.355 * 1000
+    sig_plot = np.sqrt(params['noise']**2 + params['fano'] * params['epsilon'] * e_plot) * 2.355 * 1000
     ax_graph.plot(e_plot, sig_plot, color='green', label='Curva de Resolución Fit')
     sig_plot_nom = np.sqrt(config.noise**2 + config.fano * config.epsilon * e_plot) * 2.355 * 1000
     ax_graph.plot(e_plot, sig_plot_nom, color='grey', label='Curva de Resolución Nominal', linestyle='--', alpha=0.5)
