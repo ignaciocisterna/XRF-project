@@ -367,13 +367,14 @@ class XRFDeconv:
 
         mtr.generar_reporte_completo(self.E, self.I, self.I_fit, 
                                         self.p_actual, self.elements, 
-                                        nombre_muestra=self.name, fondo=self.fondo)
+                                        nombre_muestra=self.name, fondo=self.fondo,
+                                        config=self.config)
         if pdf:
             mtr.exportar_reporte_pdf(self.E, self.I, self.I_fit, 
                                     self.p_actual, self.elements, 
                                     nombre_muestra=self.name, 
-
-                                    archivo=fname, fondo=self.fondo)
+                                    archivo=fname, fondo=self.fondo,
+                                    config=self.config)
 
 #------------------------------------------------------------------------------#
 
@@ -383,6 +384,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
