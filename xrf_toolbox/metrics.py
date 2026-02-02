@@ -403,7 +403,6 @@ def check_resolution_health(params, config):
     ax_graph.set_xlabel("Energía (keV)"); ax_graph.set_ylabel("FWHM (eV)"); ax_graph.grid(alpha=0.3)
     ax_graph.set_title("Gráfico de función de resolución Sigma(E)")
     ax_graph.legend()
-    ax_graph.plot(x, y)
     plt.show()
 
 def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, 
