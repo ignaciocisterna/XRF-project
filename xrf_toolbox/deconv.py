@@ -154,16 +154,16 @@ class XRFDeconv:
                 p_base += [area_init, 0, 0]    # K, L, M
 
         else:
-        # Para L, M o global, partimos de lo que ya tenemos ajustado
-        p_base = self.p_actual.copy()
-        
-        if etapa == "L":
-            # Inyectamos semilla en slots de L si la máscara lo permite
-            for i in range(self.offset, len(p_base)):
-                if i < len(mask) and mask[i] == 1:
-                    # Slot L es (índice - offset) % 3 == 1
-                    if (i - self.offset) % 3 == 1:
-                        p_base[i] = np.max(self.I_net) * 0.01
+            # Para L, M o global, partimos de lo que ya tenemos ajustado
+            p_base = self.p_actual.copy()
+            
+            if etapa == "L":
+                # Inyectamos semilla en slots de L si la máscara lo permite
+                for i in range(self.offset, len(p_base)):
+                    if i < len(mask) and mask[i] == 1:
+                        # Slot L es (índice - offset) % 3 == 1
+                        if (i - self.offset) % 3 == 1:
+                            p_base[i] = np.max(self.I_net) * 0.01
             
         # --- FILTRADO FINAL ÚNICO ---
         # Esto garantiza que p0_free tenga el mismo largo que los '1' en la máscara
@@ -356,6 +356,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
