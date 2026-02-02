@@ -135,46 +135,43 @@ class XRFDeconv:
 
             # Semillas de dispersión basadas en el máximo del espectro
             max_counts = np.max(self.I)
-            p0 = [
+            p_base = [
                 self.noise_init, self.fano_init, self.epsilon_init,
                 self.tau_init,
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
-            if self.fondo == "cuad": p0.append(0.0)
+            if self.fondo == "cuad": p_base.append(0.0)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
-            p0 += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
+            p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
 
             # Inicializar áreas de elementos detectados
             if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
             area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for _ in self.elements:
-                p0 += [
-                    area_init,              # K
-                    0,                      # L
-                    0                       # M
-                ]
-            return p0
-        elif etapa == "L" or etapa == "M" or etapa == "global":
-            # Creamos una copia del estado actual de los parámetros
-            p_working = self.p_actual.copy()
+                p_base += [area_init, 0, 0]    # K, L, M
+
+        else:
+        # Para L, M o global, partimos de lo que ya tenemos ajustado
+        p_base = self.p_actual.copy()
+        
+        if etapa == "L":
+            # Inyectamos semilla en slots de L si la máscara lo permite
+            for i in range(self.offset, len(p_base)):
+                if i < len(mask) and mask[i] == 1:
+                    # Slot L es (índice - offset) % 3 == 1
+                    if (i - self.offset) % 3 == 1:
+                        p_base[i] = np.max(self.I_net) * 0.01
             
-            if etapa == "L":
-                # En lugar de un bucle manual, usamos la máscara que acabamos de crear
-                # para saber dónde inyectar la semilla de intensidad
-                for i in range(self.offset, len(p_working)):
-                    # Si la máscara dice que este parámetro es una 'Area L' libre:
-                    if i < len(mask) and mask[i] == 1:
-                        # Solo aplicamos la semilla si el parámetro está en un slot de Area L
-                        # (posiciones offset+1, offset+4, offset+7...)
-                        if (i - self.offset) % 3 == 1:
-                            p_working[i] = np.max(self.I_net) * 0.01
-            
-            # Filtramos solo los parámetros que la etapa permite mover
-            p0 = [p for p, f in zip(p_working, mask) if f]
-            return p0
+        # --- FILTRADO FINAL ÚNICO ---
+        # Esto garantiza que p0_free tenga el mismo largo que los '1' en la máscara
+        if mask is not None:
+            p0_filtrado = [p for p, f in zip(p_base, mask) if f]
+            return p0_filtrado
+        
+        else: return p_base
 
 #------------------------------------------------------------------------------#
 
@@ -359,6 +356,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
