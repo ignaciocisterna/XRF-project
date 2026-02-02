@@ -406,7 +406,8 @@ def check_resolution_health(params, config):
     ax_graph.plot(x, y)
     plt.show()
 
-def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, fondo="lin", config=None):
+def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, 
+                             fondo="lin", config=None):
     """
     Genera tabla de calidad por elemento y gráficos de diagnóstico de los peores ajustes.
     """
