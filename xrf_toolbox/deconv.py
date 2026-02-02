@@ -94,33 +94,59 @@ class XRFDeconv:
             Etapa: "K", "L", "M" o "global"
             """
             n_elem = len(self.elements)
-            
-            # 1. Parte Global 
-            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-            mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
-            # Fondo y Dispersión
-            n_bkg = 2 if self.fondo == "lin" else 3
-            mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+
+            if etapa != "global": 
+                # 1. Parte Base
+                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+                mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
+                # Fondo y Dispersión
+                n_bkg = 2 if self.fondo == "lin" else 3
+                mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+            else: # global
+                # 1. Parte Base
+                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+                mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
+                # Fondo y Dispersión
+                n_bkg = 2 if self.fondo == "lin" else 3
+                mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+                
         
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
             element_masks = []
         
+            # Rango útil con un pequeño margen para no cortar colas de picos en los bordes
+            e_min, e_max = self.E.min() + 0.25, self.E.max() - 0.25
+        
+            def validar_familia(elemento, familia):
+                """Función auxiliar para chequear si una familia existe y es visible"""
+                try:
+                    # 1. ¿Es excitable por el ánodo?
+                    if not core.is_excitable(xl.SymbolToAtomicNumber(elemento), familia, self.config):
+                        return 0
+                    # 2. ¿Tiene líneas en el rango de energía actual?
+                    info = core.get_Xray_info(elemento, families=(familia,))
+                    for line_data in info.values():
+                        if e_min <= line_data['energy'] <= e_max:
+                            return 1
+                    return 0
+                except:
+                    return 0
+        
             for elem in self.elements:
-                # Inicializamos los 3 slots para este elemento [K, L, M]
-                slots = [0, 0, 0] 
-                if etapa == "K":
-                    slots[0] = 1
-                elif etapa == "L":
-                    try:
-                        info = core.get_Xray_info(elem, families=("L",))
-                        tiene_L = any((self.E.min() + 0.25) <= d['energy'] <= (self.E.max() - 0.25) for d in info.values())
-                        if tiene_L: slots[1] = 1
-                    except: pass
-                elif etapa == "M":
-                    slots[2] = 1
-                elif etapa == "global":
-                    slots = [1, 1, 1]
+                slots = [0, 0, 0] # [K, L, M]
                 
+                if etapa == "K":
+                    slots[0] = 1 # En etapa K solemos forzarla para ver qué hay
+                elif etapa == "L":
+                    slots[1] = validar_familia(elem, "L")
+                elif etapa == "M":
+                    slots[2] = validar_familia(elem, "M")
+                elif etapa == "global":
+                    # En la global, validamos las tres familias rigurosamente
+                    slots[0] = validar_familia(elem, "K")
+                    slots[1] = validar_familia(elem, "L")
+                    slots[2] = validar_familia(elem, "M")
+                    
                 element_masks.extend(slots)
                     
             return mask_base + element_masks
@@ -175,7 +201,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-6):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -279,8 +305,8 @@ class XRFDeconv:
                                       x_scale='jac', 
                                       loss='huber',
                                       max_nfev=50000,
-                                      xtol=1e-5, 
-                                      ftol=1e-5 
+                                      xtol=tol*10, 
+                                      ftol=tol*10 
                                   )
                 self.pcov = pcov 
     
@@ -357,6 +383,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
