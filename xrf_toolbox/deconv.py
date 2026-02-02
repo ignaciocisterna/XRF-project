@@ -228,6 +228,10 @@ class XRFDeconv:
 
         try:
             if etapa in ["K", "L"]:
+                for i in range(len(p0_free)):
+                    if p0_free[i] < lower[i] or p0_free[i] > upper[i]:
+                        print(f"VALOR FUERA DE RANGO: Parámetro idx global {indices_libres[i]}")
+                        print(f"Valor: {p0_free[i]}, Límites: [{lower[i]}, {upper[i]}]")
                 popt, pcov = curve_fit(frx_wrapper, 
                                       self.E[roi_mask], 
                                       self.I[roi_mask], 
@@ -356,6 +360,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
