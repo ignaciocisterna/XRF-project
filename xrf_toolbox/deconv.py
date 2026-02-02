@@ -58,6 +58,7 @@ class XRFDeconv:
         self.p_actual = None
         self.pcov = None
         self.I_fit = None
+        self.p_dict = None
 
 #------------------------------------------------------------------------------#
     
@@ -353,7 +354,9 @@ class XRFDeconv:
         t.start()
         self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol)
         stop_event.set()
-        t.join()
+        t.join() 
+        
+        self.p_dict = core.pack_params(self.p_actual, self.elements)
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
 
 #------------------------------------------------------------------------------#
@@ -385,38 +388,21 @@ class XRFDeconv:
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
 
+#------------------------------------------------------------------------------#
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def generar_tabla_resultados(self):
+        res = []
+        params = self.p_dict # El diccionario final empaquetado
+        
+        for elem, data in params["elements"].items():
+            row = {"Elemento": elem}
+            # Solo agregamos si el área es significativa (mayor a un umbral)
+            if data["area_K"] > 0: row["Area_K"] = f"{data['area_K']:.2e}"
+            if data["area_L"] > 0: row["Area_L"] = f"{data['area_L']:.2e}"
+            if data["area_M"] > 0: row["Area_M"] = f"{data['area_M']:.2e}"
+            
+            if len(row) > 1: # Si tiene al menos una familia ajustada
+                res.append(row)
+                
+        df = pd.DataFrame(res).fillna("-")
+        return df
