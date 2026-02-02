@@ -89,7 +89,7 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
 
 def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
-                       fondo="lin",show=True):    
+                       fondo="lin",show=True, config=None):    
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
@@ -141,27 +141,28 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                                 })
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
-    scat = final_params.get("scat_areas", {})
-    tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
-    target_lines = ["Ka1", "La1"]
-    tube_info = {fam: {k: v for k, v in lines.items() if k in target_lines} 
-                 for fam, lines in tube_info.items()}
-    scat_peaks = []
-                   
-    for f, lines in tube_info.items():
-        for line_name, data in lines.items():
-            E_tube = data["energy"]
-            E_com = core.get_compton_energy(E_tube, config.angle)
-            fam = core.line_family(line_name)
-            
-            ray_tag = {'e': E_tube, 'name': f"Ray-{fam}", 'area': scat.get(f"ray_{fam}", 0)}
-            scat_peaks.append(ray_tag)
-            com_tag = {'e': E_com, 'name': f"Com-{fam}", 'area': scat.get(f"com_{fam}", 0)}
-            scat_peaks.append(com_tag)
-
-    for s_peak in scat_peaks:
-        if s_peak['area'] > umbral_area_familia and E.min() < s_peak['e'] < E.max():
-            etiquetas_info.append({'e': s_peak['e'], 'name': f"Scat\n{s_peak['name']}"})
+    if config:
+        scat = final_params.get("scat_areas", {})
+        tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
+        target_lines = ["Ka1", "La1"]
+        tube_info = {fam: {k: v for k, v in lines.items() if k in target_lines} 
+                     for fam, lines in tube_info.items()}
+        scat_peaks = []
+                       
+        for f, lines in tube_info.items():
+            for line_name, data in lines.items():
+                E_tube = data["energy"]
+                E_com = core.get_compton_energy(E_tube, config.angle)
+                fam = core.line_family(line_name)
+                
+                ray_tag = {'e': E_tube, 'name': f"Ray-{fam}", 'area': scat.get(f"ray_{fam}", 0)}
+                scat_peaks.append(ray_tag)
+                com_tag = {'e': E_com, 'name': f"Com-{fam}", 'area': scat.get(f"com_{fam}", 0)}
+                scat_peaks.append(com_tag)
+    
+        for s_peak in scat_peaks:
+            if s_peak['area'] > umbral_area_familia and E.min() < s_peak['e'] < E.max():
+                etiquetas_info.append({'e': s_peak['e'], 'name': f"Scat\n{s_peak['name']}"})
 
     # --- INDICADORES DE ARTEFACTOS (ESCAPE Y SUMA) ---
     # Solo graficamos si el pico principal es muy fuerte (> 20% del max global)
