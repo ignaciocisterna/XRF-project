@@ -157,11 +157,11 @@ def get_efficiency(energy, config):
     x_dead = config.dead_layer * 1e-4 
     
     # 1. Transmisión ventana Be
-    mu_be = xl.CS_Total(4, E) 
+    mu_be = xl.CS_Total(4, energy) 
     trans_be = np.exp(-mu_be * rho_be * x_be)
     
     # 2. Transmisión/Absorción en Si
-    mu_si = xl.CS_Total(14, E)
+    mu_si = xl.CS_Total(14, energy)
     # Transmisión a través de la capa muerta
     trans_dead = np.exp(-mu_si * rho_si * x_dead)
     # Absorción en el volumen activo
@@ -211,7 +211,7 @@ def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, live_tim
     # Usamos la función zero-hardcode que definimos antes
     ratio_esc = get_escape_ratio(E0)
     if ratio_esc > 0:
-        E_esc = E0 - 1.74  # Energía desplazada por el escape del Si
+        E_esc = E0 - xl.LineEnergy(14, xl.KA1_LINE)  # Energía desplazada por el escape del Si
         # Recalculamos la resolución para la nueva energía
         s_esc = sigma_E(E_esc, params["noise"], params["fano"], params["epsilon"])
         spectrum += voigt_peak(E, area * ratio_esc, E_esc, s_esc, gamma)
@@ -451,6 +451,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
