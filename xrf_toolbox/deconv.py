@@ -289,7 +289,7 @@ class XRFDeconv:
     
             if graf:
                 mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                    popt, self.p_actual, [etapa])
+                                    popt, self.p_actual, [etapa], config=self.config)
 
         except Exception as e:
             print(f"Error al ajustar {etapa}: {e}")
@@ -357,6 +357,7 @@ class XRFDeconv:
         """
         params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
         mtr.check_resolution_health(params, self.config)
+
 
 
 
