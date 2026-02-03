@@ -199,7 +199,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         y_peak = np.max(I[max(0, idx_e0-3):min(len(I), idx_e0+3)])
 
         nivel = i % 6 
-        y_text = y_peak + (max(I) * (0.025 + nivel * 0.12))
+        y_text = y_peak + (max(I) * (0.025 + nivel * 0.14))
 
         color = 'black' if tag['type'] == 'elem' else 'blue'
         alpha = 0.8 if tag['type'] == 'elem' else 0.6
@@ -214,7 +214,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
     plt.ylabel('Cuentas')
     plt.title(f'Deconvolución sobre Capas {", ".join(shells)} y Dispersión')
     plt.xlim(E.min(), E.max()*1.05)
-    plt.ylim(0, max(I) * 1.8) # Más espacio arriba para etiquetas
+    plt.ylim(0, max(I) * 2) # Más espacio arriba para etiquetas
     plt.grid(True, alpha=0.05)
     plt.legend()
     if show: plt.show()
