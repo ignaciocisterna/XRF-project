@@ -121,48 +121,54 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         for fam in shells:
             area_fam = elem_data.get(f"area_{fam}", 0)
             
-            # DIAGNÓSTICO (Opcional): Descomenta para ver qué áreas encuentra
-            # if area_fam > 0: print(f"Elemento {elem} {fam} area: {area_fam}")
-
+            # Solo etiquetamos si el área es significativa
             if area_fam > umbral_area_familia:
-                for line_name, line_data in info.items():
-                    if line_name.startswith(fam):
-                        # Usamos un umbral de ratio más bajo para ver Ka y Kb
-                        if line_data["ratio"] >= umbral_ratio_linea:
-                            e0 = line_data["energy"]
-                            if E.min() < e0 < E.max():
-                                # Excluir Mo en zona de dispersión
-                                if elem == "Mo" and (17.0 < e0 < 17.6):
-                                    continue 
-                                
-                                etiquetas_info.append({
-                                    'e': e0,
-                                    'name': f"{elem}-{line_name}"
-                                })
+                # Buscamos la línea principal de la familia (alfa) para poner la etiqueta
+                lines_in_fam = {k: v for k, v in info.items() if k.startswith(fam)}
+                if not lines_in_fam: continue
+                
+                # Seleccionamos la línea con mayor ratio para posicionar el texto
+                main_line = max(lines_in_fam, key=lambda x: lines_in_fam[x]["ratio"])
+                e0 = lines_in_fam[main_line]["energy"]
+
+                if E.min() < e0 < E.max():
+                    # Evitar Mo en zona de dispersión si el ánodo es Mo
+                    if config and config.anode == "Mo" and elem == "Mo" and (17.0 < e0 < 17.6):
+                        continue
+                        
+                    etiquetas_info.append({
+                        'e': e0,
+                        'name': f"{elem}\n(A_{fam}: {area_fam:.1e})", # Agregamos el área aquí
+                        'type': 'elem'
+                    })
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
         scat = final_params.get("scat_areas", {})
         tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
-        target_lines = ["Ka1", "La1"]
-        tube_info = {fam: {k: v for k, v in lines.items() if k in target_lines} 
-                     for fam, lines in tube_info.items()}
+        # Nos enfocamos en las líneas más intensas del tubo para dispersión
         scat_peaks = []
-                       
-        for f, lines in tube_info.items():
-            for line_name, data in lines.items():
-                E_tube = data["energy"]
+        
+        for fam_tube, lines in tube_info.items():
+            # Buscamos Ka1 o La1
+            target = "Ka1" if fam_tube == "K" else "La1"
+            if target in lines:
+                E_tube = lines[target]["energy"]
                 E_com = core.get_compton_energy(E_tube, config.angle)
-                fam = core.line_family(line_name)
                 
-                ray_tag = {'e': E_tube, 'name': f"Ray-{fam}", 'area': scat.get(f"ray_{fam}", 0)}
-                scat_peaks.append(ray_tag)
-                com_tag = {'e': E_com, 'name': f"Com-{fam}", 'area': scat.get(f"com_{fam}", 0)}
-                scat_peaks.append(com_tag)
-    
+                # Rayleigh
+                area_ray = scat.get(f"ray_{fam_tube}", 0)
+                if area_ray > umbral_area_familia:
+                    scat_peaks.append({'e': E_tube, 'name': f"Ray-{fam_tube}\n({area_ray:.1e})"})
+                
+                # Compton
+                area_com = scat.get(f"com_{fam_tube}", 0)
+                if area_com > umbral_area_familia:
+                    scat_peaks.append({'e': E_com, 'name': f"Com-{fam_tube}\n({area_com:.1e})"})
+
         for s_peak in scat_peaks:
-            if s_peak['area'] > umbral_area_familia and E.min() < s_peak['e'] < E.max():
-                etiquetas_info.append({'e': s_peak['e'], 'name': f"Scat\n{s_peak['name']}"})
+            if E.min() < s_peak['e'] < E.max():
+                etiquetas_info.append({'e': s_peak['e'], 'name': s_peak['name'], 'type': 'scat'})
 
     # --- INDICADORES DE ARTEFACTOS (ESCAPE Y SUMA) ---
     # Solo graficamos si el pico principal es muy fuerte (> 20% del max global)
@@ -190,15 +196,19 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         e0 = tag['e']
         idx_e0 = np.abs(E - e0).argmin()
         # Buscamos el máximo en los datos cerca de la energía para posicionar el texto
-        y_peak = np.max(I[max(0, idx_e0-5):min(len(I), idx_e0+5)])
+        y_peak = np.max(I[max(0, idx_e0-3):min(len(I), idx_e0+3)])
 
         nivel = i % 6 
         y_text = y_peak + (max(I) * (0.025 + nivel * 0.12))
 
-        plt.vlines(e0, y_peak, y_text, color='lightgrey', linestyle='--', alpha=0.5, lw=0.8)
-        plt.text(e0, y_text, tag['name'], fontsize=8, rotation=0, 
-                 ha='center', va='bottom', fontweight='bold' if "peak" in tag['name'] else 'normal',
-                 bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=0.2))
+        color = 'black' if tag['type'] == 'elem' else 'blue'
+        alpha = 0.8 if tag['type'] == 'elem' else 0.6
+        fontstyle = 'italic' if tag['type'] == 'art' else 'normal'
+        
+        plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
+        plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, aplha=alpha,
+                 ha='center', va='bottom', fontweight='bold', fontstyle=fontstyle
+                 bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=0.1))
 
     plt.xlabel('Energía (keV)')
     plt.ylabel('Cuentas')
@@ -412,7 +422,7 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
     """
     print(f"\n{'='*25} REPORTE: {nombre_muestra} {'='*25}")
 
-    graficar_ajuste(E, I, I_fit, elementos, popt, fondo=fondo)
+    graficar_ajuste(E, I, I_fit, elementos, popt, fondo=fondo, config=config)
      
     _ = evaluar_ajuste_global(E, I, I_fit, len(popt))
   
