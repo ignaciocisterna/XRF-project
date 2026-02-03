@@ -160,11 +160,13 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                 area_ray = scat.get(f"ray_{fam_tube}", 0)
                 if area_ray > umbral_area_familia:
                     scat_peaks.append({'e': E_tube, 'name': f"Ray-{fam_tube}\n({area_ray:.1e})"})
+                    print(f"etiqueta de R-{fam_tube} guardada")
                 
                 # Compton
                 area_com = scat.get(f"com_{fam_tube}", 0)
                 if area_com > umbral_area_familia:
                     scat_peaks.append({'e': E_com, 'name': f"Com-{fam_tube}\n({area_com:.1e})"})
+                    print(f"etiqueta de C-{fam_tube} guardada")
 
         for s_peak in scat_peaks:
             if E.min() < s_peak['e'] < E.max():
@@ -196,7 +198,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         e0 = tag['e']
         idx_e0 = np.abs(E - e0).argmin()
         # Buscamos el máximo en los datos cerca de la energía para posicionar el texto
-        y_peak = np.max(I[max(0, idx_e0-3):min(len(I), idx_e0+3)])
+        y_peak = np.max(I[max(0, idx_e0-5):min(len(I), idx_e0+5)])
 
         nivel = i % 6 
         y_text = y_peak + (max(I) * (0.025 + nivel * 0.14))
