@@ -207,7 +207,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         
         plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
         plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, aplha=alpha,
-                 ha='center', va='bottom', fontweight='bold', fontstyle=fontstyle
+                 ha='center', va='bottom', fontweight='bold', fontstyle=fontstyle,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=0.1))
 
     plt.xlabel('Energía (keV)')
