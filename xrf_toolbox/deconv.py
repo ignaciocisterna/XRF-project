@@ -315,8 +315,22 @@ class XRFDeconv:
             self.I_fit = frx_wrapper(self.E, *popt) 
     
             if graf:
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                    popt, self.p_actual, [etapa], config=self.config)
+                if etapa == "K":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                                        popt, self.p_actual, [etapa], umbral_ratio_linea=0.1,
+                                        config=self.config)
+                elif etapa == "L":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                                        popt, self.p_actual, [etapa],
+                                        config=self.config)
+                elif etapa == "M":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                                        popt, self.p_actual, [etapa], umbral_area_familia=0,
+                                        umbral_ratio_linea=0.1, config=self.config)
+                else:
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                                        popt, self.p_actual, ["K", "L", "M"],
+                                        config=self.config)
 
         except Exception as e:
             print(f"Error al ajustar {etapa}: {e}")
@@ -406,4 +420,5 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
