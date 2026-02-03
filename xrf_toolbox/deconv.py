@@ -168,7 +168,7 @@ class XRFDeconv:
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
-            if self.fondo == "cuad": p_base.append(1e-4)
+            if self.fondo == "cuad": p_base.append(1e-2)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
@@ -420,6 +420,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
