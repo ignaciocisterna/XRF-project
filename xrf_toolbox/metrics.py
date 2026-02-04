@@ -144,6 +144,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
+        print("entrando en fase de etiquetado de dispersión")
         scat = final_params.get("scat_areas", {})
         tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
         # Nos enfocamos en las líneas más intensas del tubo para dispersión
