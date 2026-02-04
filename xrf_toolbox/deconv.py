@@ -96,7 +96,7 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
 
     def validar_familia(self, elemento, familia):
-                """Función auxiliar para chequear si una familia existe y es visible"""
+        """Función auxiliar para chequear si una familia existe y es visible"""
         # Rango útil con un pequeño margen para no cortar colas de picos en los bordes
         e_min, e_max = self.E.min() + 0.25, self.E.max() - 0.25
         try:
@@ -433,6 +433,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
