@@ -109,7 +109,6 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
 
     # --- IDENTIFICACIÓN DE LÍNEAS ATÓMICAS ---
     for elem in elementos:
-        print(elem)
         if elem not in final_params["elements"]: 
             continue
         
@@ -122,7 +121,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
 
         for fam in shells:
             area_fam = elem_data.get(f"area_{fam}", 0)
-            
+            print(f"area de {elem}: {area_fam}")
             # Solo etiquetamos si el área es significativa
             if area_fam > umbral_area_familia:
                 print(f"area > umbral == True para {elem}")
