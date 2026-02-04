@@ -209,7 +209,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5, config=None):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -325,19 +325,21 @@ class XRFDeconv:
                 print('Graficando ajuste...')
                 if etapa == "K":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                        popt, self.p_actual, [etapa], umbral_area_familia=0.5,
+                                        popt, self.p_actual, [etapa], fondo=self.fondo,
+                                        umbral_area_familia=0.5,
                                         umbral_ratio_linea=0.1, config=self.config)
                 elif etapa == "L":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                        popt, self.p_actual, [etapa],
+                                        popt, self.p_actual, [etapa], fondo=self.fondo,
                                         config=self.config)
                 elif etapa == "M":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                        popt, self.p_actual, [etapa], umbral_area_familia=0,
+                                        popt, self.p_actual, [etapa],  fondo=self.fondo,
+                                        umbral_area_familia=0,
                                         umbral_ratio_linea=0.1, config=self.config)
                 else:
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                        popt, self.p_actual, ["K", "L", "M"],
+                                        popt, self.p_actual, ["K", "L", "M"], fondo=self.fondo,
                                         config=self.config)
 
         except Exception as e:
@@ -364,7 +366,7 @@ class XRFDeconv:
                 args=(stop_event, f"  > Ajustando Capas {etapa}")
             )
             t.start()
-            self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol, config=self.config)
+            self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol)
             stop_event.set()
             t.join()
         
@@ -374,7 +376,7 @@ class XRFDeconv:
             args=(stop_event, "  > Refinando Ajuste Global")
         )
         t.start()
-        self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol, config=self.config)
+        self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol)
         stop_event.set()
         t.join() 
         
@@ -428,6 +430,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
