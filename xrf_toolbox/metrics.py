@@ -113,6 +113,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
             continue
         
         elem_data = final_params["elements"][elem]
+        print(elem_data)
         try:
             # Reutilizamos la función del paquete para obtener energías
             info = core.get_Xray_info(elem, families=tuple(shells))
@@ -212,7 +213,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         fontweight = 'normal'
         
         plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
-        plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, alpha=alpha, color=color,
+        plt.text(e0, y_text, tag['name'], fontsize=8, rotation=0, alpha=alpha, color=color,
                  ha='center', va='bottom', fontweight=fontweight, fontstyle=fontstyle,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=0.1))
 
