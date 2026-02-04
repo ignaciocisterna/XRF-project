@@ -109,13 +109,18 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
 
     # --- IDENTIFICACIÓN DE LÍNEAS ATÓMICAS ---
     for elem in elementos:
-        if elem not in final_params["elements"]: continue
+        print(elem)
+        if elem not in final_params["elements"]: 
+            print(f"elem not in final_paramas: {elem}")
+            continue
         
         elem_data = final_params["elements"][elem]
         try:
             # Reutilizamos la función del paquete para obtener energías
             info = core.get_Xray_info(elem, families=tuple(shells))
+            print(f"info de {elem} extraida")
         except:
+            print(f"info de {elem} no se pudo extraer")
             continue
 
         for fam in shells:
@@ -151,27 +156,25 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         # Nos enfocamos en las líneas más intensas del tubo para dispersión
         scat_peaks = []
         
-        for fam_tube, lines in tube_info.items():
-            print(f"fam_tube: {fam_tube}")
-            print(f"lines: {lines}")
+        for line, data in tube_info.items():
             # Buscamos Ka1 o La1
-            target = "Ka1" if fam_tube == "K" else "La1"
-            if target in lines:
-                print(f"target in line: {target}")
-                E_tube = lines[target]["energy"]
+            if line == "Ka1" or line == "La1":
+                print(f"target line found: {line}")
+                E_tube = data["energy"]
                 E_com = core.get_compton_energy(E_tube, config.angle)
+                fam = core.line_family(line)
                 
                 # Rayleigh
-                area_ray = scat.get(f"ray_{fam_tube}", 0)
+                area_ray = scat.get(f"ray_{fam}", 0)
                 if area_ray > umbral_area_familia:
-                    scat_peaks.append({'e': E_tube, 'name': f"Ray-{fam_tube}\n({area_ray:.1e})"})
-                    print(f"etiqueta de R-{fam_tube} guardada")
+                    scat_peaks.append({'e': E_tube, 'name': f"Ray-{fam}\n({area_ray:.1e})"})
+                    print(f"etiqueta de R-{fam} guardada")
                 
                 # Compton
-                area_com = scat.get(f"com_{fam_tube}", 0)
+                area_com = scat.get(f"com_{fam}", 0)
                 if area_com > umbral_area_familia:
-                    scat_peaks.append({'e': E_com, 'name': f"Com-{fam_tube}\n({area_com:.1e})"})
-                    print(f"etiqueta de C-{fam_tube} guardada")
+                    scat_peaks.append({'e': E_com, 'name': f"Com-{fam}\n({area_com:.1e})"})
+                    print(f"etiqueta de C-{fam} guardada")
 
         for s_peak in scat_peaks:
             if E.min() < s_peak['e'] < E.max():
