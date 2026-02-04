@@ -95,7 +95,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def validar_familia(elemento, familia):
+    def validar_familia(self, elemento, familia):
                 """Función auxiliar para chequear si una familia existe y es visible"""
                 try:
                     # 1. ¿Es excitable por el ánodo?
@@ -432,6 +432,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
