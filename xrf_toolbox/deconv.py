@@ -146,7 +146,7 @@ class XRFDeconv:
                 slots = [0, 0, 0] # [K, L, M]
                 
                 if etapa == "K":
-                    slots[0] = 1 # En etapa K solemos forzarla para ver qué hay
+                    slots[0] = self.validar_familia(elem, "K")
                 elif etapa == "L":
                     slots[1] = self.validar_familia(elem, "L")
                 elif etapa == "M":
@@ -184,9 +184,10 @@ class XRFDeconv:
 
             # Inicializar áreas de elementos detectados
             if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
-            area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
+            area_init_gral = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
-            for _ in self.elements:
+            for elem in self.elements:
+                area_init = area_init_gral * self.validar_familia(elem, "K")
                 p_base += [area_init, 0, 0]    # K, L, M
 
         else:
@@ -432,6 +433,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
