@@ -209,7 +209,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         color = 'black' if tag['type'] == 'elem' else 'blue'
         alpha = 0.8 if tag['type'] == 'elem' else 0.6
         fontstyle = 'italic' if tag['type'] == 'art' else 'normal'
-        fontweight = 'bold' if tag['type'] == 'scat' else 'normal'
+        fontweight = 'normal'
         
         plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
         plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, alpha=alpha, color=color,
