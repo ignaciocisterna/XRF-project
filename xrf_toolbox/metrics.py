@@ -141,6 +141,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                         'name': f"{elem}-{fam}\n({area_fam:.1e})", # Agregamos el área aquí
                         'type': 'elem'
                     })
+                    print(f"etiqueta de {elem} guardada")
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
@@ -151,9 +152,12 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         scat_peaks = []
         
         for fam_tube, lines in tube_info.items():
+            print(f"fam_tube: {fam_tube}")
+            print(f"lines: {lines}")
             # Buscamos Ka1 o La1
             target = "Ka1" if fam_tube == "K" else "La1"
             if target in lines:
+                print(f"target in line: {target}")
                 E_tube = lines[target]["energy"]
                 E_com = core.get_compton_energy(E_tube, config.angle)
                 
