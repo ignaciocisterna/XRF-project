@@ -202,7 +202,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
+    def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5, config=None):
         free_mask = self.get_mask(etapa)
 
         # Si es la primera etapa (K), inicializamos p_actual con p0 completo
@@ -420,6 +420,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
