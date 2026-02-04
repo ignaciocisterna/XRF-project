@@ -358,6 +358,7 @@ class XRFDeconv:
 
     def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-6):
         """Ejecuta el pipeline completo de ajuste secuencial."""
+        print(" > Iniciando Deconvolución:")
         for etapa in ["K", "L", "M"]:
             stop_event = threading.Event()
             t = threading.Thread(
@@ -429,6 +430,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
