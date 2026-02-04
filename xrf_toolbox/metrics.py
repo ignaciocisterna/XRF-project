@@ -213,7 +213,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         fontweight = 'bold' if tag['type'] == 'scat' else 'normal'
         
         plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
-        plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, alpha=alpha,
+        plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, alpha=alpha, color=color,
                  ha='center', va='bottom', fontweight=fontweight, fontstyle=fontstyle,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=0.1))
 
