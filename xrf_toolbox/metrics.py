@@ -199,7 +199,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         y_peak = np.max(I[max(0, idx_e0-5):min(len(I), idx_e0+5)])
 
         nivel = i % 6 
-        y_text = y_peak + (max(I) * (0.025 + nivel * 0.14))
+        y_text = y_peak + (max(I) * (0.04 + nivel * 0.14))
 
         color = 'black' if tag['type'] == 'elem' else 'darkblue'
         alpha = 0.8 if tag['type'] == 'elem' else 0.6
