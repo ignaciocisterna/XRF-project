@@ -111,16 +111,13 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
     for elem in elementos:
         print(elem)
         if elem not in final_params["elements"]: 
-            print(f"elem not in final_paramas: {elem}")
             continue
         
         elem_data = final_params["elements"][elem]
         try:
             # Reutilizamos la función del paquete para obtener energías
             info = core.get_Xray_info(elem, families=tuple(shells))
-            print(f"info de {elem} extraida")
         except:
-            print(f"info de {elem} no se pudo extraer")
             continue
 
         for fam in shells:
