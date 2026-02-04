@@ -89,9 +89,9 @@ class XRFDeconv:
             for elem in self.elements:
                 status = "Ingresado Manualmente" if elem in manual else "Autodetectado"
                 if len(elem) == 2:
-                    print(f"     {elem} ----------- {status}")
+                    print(f"      {elem} ---------- {status}")
                 else:
-                    print(f"      {elem} ----------- {status}")
+                    print(f"       {elem} ---------- {status}")
 
 #------------------------------------------------------------------------------#
 
@@ -428,6 +428,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
