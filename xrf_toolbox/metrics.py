@@ -113,7 +113,6 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
             continue
         
         elem_data = final_params["elements"][elem]
-        print(elem_data)
         try:
             # Reutilizamos la función del paquete para obtener energías
             info = core.get_Xray_info(elem, families=tuple(shells))
@@ -122,10 +121,8 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
 
         for fam in shells:
             area_fam = elem_data.get(f"area_{fam}", 0)
-            print(f"area de {elem}: {area_fam}")
             # Solo etiquetamos si el área es significativa
             if area_fam > umbral_area_familia:
-                print(f"area > umbral == True para {elem}")
                 # Buscamos la línea principal de la familia (alfa) para poner la etiqueta
                 lines_in_fam = {k: v for k, v in info.items() if k.startswith(fam)}
                 if not lines_in_fam: continue
@@ -133,7 +130,6 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                 # Seleccionamos la línea con mayor ratio para posicionar el texto
                 main_line = max(lines_in_fam, key=lambda x: lines_in_fam[x]["ratio"])
                 e0 = lines_in_fam[main_line]["energy"]
-                print("línea máxima de la familia encontrada")
 
                 if E.min() < e0 < E.max():
                     # Evitar Mo en zona de dispersión si el ánodo es Mo
@@ -145,11 +141,9 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                         'name': f"{elem}-{fam}\n({area_fam:.1e})", # Agregamos el área aquí
                         'type': 'elem'
                     })
-                    print(f"etiqueta de {elem} guardada")
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
-        print("entrando en fase de etiquetado de dispersión")
         scat = final_params.get("scat_areas", {})
         tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
         # Nos enfocamos en las líneas más intensas del tubo para dispersión
