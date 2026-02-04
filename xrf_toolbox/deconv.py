@@ -183,9 +183,10 @@ class XRFDeconv:
 
             # Inicializar áreas de elementos detectados
             if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
-            area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
+            area_init_gral = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for elem in self.elements:
+                area_init = area_init_gral * self.validar_familia(elem, "K")
                 p_base += [area_init, 0, 0]    # K, L, M
 
         else:
@@ -433,6 +434,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
