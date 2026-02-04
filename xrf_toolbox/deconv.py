@@ -184,10 +184,9 @@ class XRFDeconv:
 
             # Inicializar áreas de elementos detectados
             if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
-            area_init_gral = np.trapezoid(self.I_net, self.E) / len(self.elements)
+            area_init = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for elem in self.elements:
-                area_init = area_init_gral * self.validar_familia(elem, "K")
                 p_base += [area_init, 0, 0]    # K, L, M
 
         else:
@@ -197,10 +196,12 @@ class XRFDeconv:
             if etapa == "L":
                 # Inyectamos semilla en slots de L si la máscara lo permite
                 for i in range(self.offset, len(p_base)):
+                    pos = (i - self.offset) % 3
                     if i < len(mask) and mask[i] == 1:
                         # Slot L es (índice - offset) % 3 == 1
-                        if (i - self.offset) % 3 == 1:
+                        if pos == 1:
                             p_base[i] = np.max(self.I_net) * 0.01
+                
             
         # --- FILTRADO FINAL ÚNICO ---
         # Esto garantiza que p0_free tenga el mismo largo que los '1' en la máscara
@@ -433,6 +434,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
