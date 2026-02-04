@@ -206,7 +206,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         nivel = i % 6 
         y_text = y_peak + (max(I) * (0.025 + nivel * 0.14))
 
-        color = 'black' if tag['type'] == 'elem' else 'blue'
+        color = 'black' if tag['type'] == 'elem' else 'darkblue'
         alpha = 0.8 if tag['type'] == 'elem' else 0.6
         fontstyle = 'italic' if tag['type'] == 'art' else 'normal'
         fontweight = 'normal'
