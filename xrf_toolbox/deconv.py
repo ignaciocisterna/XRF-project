@@ -340,10 +340,10 @@ class XRFDeconv:
                                         popt, self.p_actual, [etapa],  fondo=self.fondo,
                                         umbral_area_familia=0,
                                         umbral_ratio_linea=0.1, config=self.config)
-                else:
+                else: # global
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
                                         popt, self.p_actual, ["K", "L", "M"], fondo=self.fondo,
-                                        config=self.config)
+                                        umbral_ratio_linea=0.75, config=self.config)
 
         except Exception as e:
             print(f"Error al ajustar {etapa}: {e}")
@@ -434,6 +434,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
