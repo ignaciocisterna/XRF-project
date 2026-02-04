@@ -423,7 +423,7 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
     """
     print(f"\n{'='*25} REPORTE: {nombre_muestra} {'='*25}")
 
-    graficar_ajuste(E, I, I_fit, elementos, popt, fondo=fondo, config=config)
+    graficar_ajuste(E, I, I_fit, elementos, popt, fondo=fondo, umbral_ratio_linea=0.75, config=config)
      
     _ = evaluar_ajuste_global(E, I, I_fit, len(popt))
   
