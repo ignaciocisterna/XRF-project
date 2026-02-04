@@ -91,7 +91,7 @@ class XRFDeconv:
                 if len(elem) == 2:
                     print(f"     {elem} ----------- {status}")
                 else:
-                    print(f"     {elem}  ----------- {status}")
+                    print(f"      {elem} ----------- {status}")
 
 #------------------------------------------------------------------------------#
 
@@ -428,6 +428,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
