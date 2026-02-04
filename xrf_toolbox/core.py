@@ -147,8 +147,8 @@ def get_efficiency(energy, config):
     Calcula la eficiencia intrínseca del detector usando datos de config.
     """
     # Densidades (g/cm3)
-    rho_be = xl.ElementDensity(4)
-    rho_si = xl.ElementDensity(14)
+    rho_be = xl.ElementDensity(4)     # Be
+    rho_si = xl.ElementDensity(14)    # Si
     
     # Espesores desde config
     x_be = config.win_thick * 1e-4  # um a cm
@@ -245,17 +245,20 @@ def voigt_peak(E, area, E0, sigma, gamma):
     """
     return area * voigt_profile(E - E0, sigma, gamma)
 
-def get_doppler_width(E_inc):
+def get_doppler_width(E_inc, angle_deg):
     """
     Calcula una sigma de Doppler aproximada.
     Para TXRF con muestras ligeras, el ensanchamiento es ~0.3% de la E_inc.
     """
-    # Constante empírica para un ajuste balanceado (puede requerir ajuste para muestras sólidas)
-    cte_ensanchamiento = 0.0028    
-    return E_inc * cte_ensanchamiento  
+    m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
+    angle_rad = np.radians(angle_deg)
+    # Constante de momento electrónico típico de la matriz (agua/ácido ligero en este caso)
+    cte_mom_elec = 0.045
+    factor_geometrico = np.sin(angle_rad / 2)
+    return (E_inc**2 / m_e_c2) * factor_geometrico *  cte_mom_elec
 
 # Perfil de los peaks de dispersión de Compton
-def compton_peak(E, area, E_com, E_inc, sigma_inst):
+def compton_peak(E, area, E_com, E_inc, sigma_inst, angle_deg):
     """
     E: Vector de energías.
     E_com: Centro del pico Compton.
@@ -263,14 +266,14 @@ def compton_peak(E, area, E_com, E_inc, sigma_inst):
     sigma_inst: Resolución instrumental (sigma_E).
     """
     # Calcular el ensanchamiento de Doppler
-    doppler_width = get_doppler_width(E_inc)
+    doppler_width = get_doppler_width(E_inc, angle_deg)
     
     # La sigma total es la suma cuadrática de la resolución y el Doppler
     sigma_total = np.sqrt(sigma_inst**2 + doppler_width**2)
     
     # Usamos una Gaussiana (o Voigt con gamma muy pequeña)
     # El perfil Compton tiende a ser más ancho que el Rayleigh
-    return area * voigt_profile(E - E_com, sigma_total, 0.001)
+    return area * voigt_profile(E - E_com, sigma_total, 0.01)
 
 
 # Identificador de familias de señal
@@ -304,8 +307,18 @@ def is_excitable(Z, family, config):
     except ValueError:
         return False
 
-# Modelo
-def FRX_model_sdd_general(E_raw, params, live_time, config):
+# Modelo Fondo continuo
+def conti_bkg(E, params, fondo="lin"):
+    """ Función del fondo ajustable """
+    if fondo == "lin" or fondo == "cuad":
+        bkg_coeffs = params["background"]
+        # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
+        background = np.polyval(bkg_coeffs[::-1], E)
+    return background
+
+
+# Modelo Espectro
+def FRX_model_sdd_general(E_raw, params, live_time, fondo="lin", config=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
@@ -386,12 +399,10 @@ def FRX_model_sdd_general(E_raw, params, live_time, config):
             E_com = get_compton_energy(E_tube, config.angle)
             s_com = sigma_E(E_com, noise, fano, epsilon)
             # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
-            spectrum += compton_peak(E, a_com * ratio, E_com, E_tube, s_com) * get_efficiency(E_com, config)
+            spectrum += compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle) * get_efficiency(E_com, config)
 
    # --- FONDO DINÁMICO ---
-    bkg_coeffs = params["background"]
-    # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
-    background = np.polyval(bkg_coeffs[::-1], E)
+    background = conti_bkg(E, params, fondo=fondo)
     
     # spectrum es la suma de picos calculada previamente
     return spectrum + background
@@ -451,6 +462,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
