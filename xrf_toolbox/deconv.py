@@ -325,8 +325,8 @@ class XRFDeconv:
                 print('Graficando ajuste...')
                 if etapa == "K":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
-                                        popt, self.p_actual, [etapa], umbral_ratio_linea=0.1,
-                                        config=self.config)
+                                        popt, self.p_actual, [etapa], umbral_area_familia=0.5,
+                                        umbral_ratio_linea=0.1, config=self.config)
                 elif etapa == "L":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
                                         popt, self.p_actual, [etapa],
@@ -428,6 +428,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
