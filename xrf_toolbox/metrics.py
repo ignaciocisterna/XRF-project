@@ -128,6 +128,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
             
             # Solo etiquetamos si el área es significativa
             if area_fam > umbral_area_familia:
+                print(f"area > umbral == True para {elem}")
                 # Buscamos la línea principal de la familia (alfa) para poner la etiqueta
                 lines_in_fam = {k: v for k, v in info.items() if k.startswith(fam)}
                 if not lines_in_fam: continue
@@ -135,6 +136,7 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                 # Seleccionamos la línea con mayor ratio para posicionar el texto
                 main_line = max(lines_in_fam, key=lambda x: lines_in_fam[x]["ratio"])
                 e0 = lines_in_fam[main_line]["energy"]
+                print("línea máxima de la familia encontrada")
 
                 if E.min() < e0 < E.max():
                     # Evitar Mo en zona de dispersión si el ánodo es Mo
@@ -159,7 +161,6 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         for line, data in tube_info.items():
             # Buscamos Ka1 o La1
             if line == "Ka1" or line == "La1":
-                print(f"target line found: {line}")
                 E_tube = data["energy"]
                 E_com = core.get_compton_energy(E_tube, config.angle)
                 fam = core.line_family(line)
@@ -168,13 +169,11 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
                 area_ray = scat.get(f"ray_{fam}", 0)
                 if area_ray > umbral_area_familia:
                     scat_peaks.append({'e': E_tube, 'name': f"Ray-{fam}\n({area_ray:.1e})"})
-                    print(f"etiqueta de R-{fam} guardada")
                 
                 # Compton
                 area_com = scat.get(f"com_{fam}", 0)
                 if area_com > umbral_area_familia:
                     scat_peaks.append({'e': E_com, 'name': f"Com-{fam}\n({area_com:.1e})"})
-                    print(f"etiqueta de C-{fam} guardada")
 
         for s_peak in scat_peaks:
             if E.min() < s_peak['e'] < E.max():
@@ -214,10 +213,11 @@ def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"]
         color = 'black' if tag['type'] == 'elem' else 'blue'
         alpha = 0.8 if tag['type'] == 'elem' else 0.6
         fontstyle = 'italic' if tag['type'] == 'art' else 'normal'
+        fontweight = 'bold' if tag['type'] == 'scat' else 'normal'
         
         plt.vlines(e0, y_peak, y_text, color=color, linestyle=':', alpha=0.3, lw=0.7)
         plt.text(e0, y_text, tag['name'], fontsize=7, rotation=0, alpha=alpha,
-                 ha='center', va='bottom', fontweight='normal', fontstyle=fontstyle,
+                 ha='center', va='bottom', fontweight=fontweight, fontstyle=fontstyle,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=0.1))
 
     plt.xlabel('Energía (keV)')
