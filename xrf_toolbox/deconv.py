@@ -356,7 +356,7 @@ class XRFDeconv:
                 args=(stop_event, f"  > Ajustando Capas {etapa}")
             )
             t.start()
-            self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol)
+            self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol, config=self.config)
             stop_event.set()
             t.join()
         
@@ -366,7 +366,7 @@ class XRFDeconv:
             args=(stop_event, "  > Refinando Ajuste Global")
         )
         t.start()
-        self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol)
+        self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol, config=self.config)
         stop_event.set()
         t.join() 
         
@@ -420,6 +420,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
