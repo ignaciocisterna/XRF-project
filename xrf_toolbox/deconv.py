@@ -145,7 +145,7 @@ class XRFDeconv:
                 slots = [0, 0, 0] # [K, L, M]
                 
                 if etapa == "K":
-                    slots[0] = 1
+                    slots[0] = self.validar_familia(elem, "K")
                 elif etapa == "L":
                     slots[1] = self.validar_familia(elem, "L")
                 elif etapa == "M":
@@ -433,6 +433,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
