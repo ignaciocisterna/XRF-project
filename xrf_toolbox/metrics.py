@@ -87,6 +87,25 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     plt.tight_layout()
     plt.show()
 
+def graficar_fondo(E, I, bkg_fit, figsize=(12, 8), show=True, fondo="lin"):
+    if show: plt.figure(figsize=figsize)
+    plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
+    plt.plot(E, bkg_fit, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
+    plt.xlabel('Energía (keV)')
+    plt.ylabel('Cuentas')
+    if fondo == "lin":
+        modelo_fondo = "Lineal"
+    elif fondo == "cuad":
+        modelo_fondo = "Cuadrático"
+    elif fondo == "exp_poly":
+        modelo_fondo = "Exponencial Polinomial"
+    plt.title(f'Ajuste de Fondo Continuo con modelo {modelo_fondo}')
+    #plt.xlim(E.min(), E.max()*1.05)
+    #plt.ylim(0, max(I) * 2) # Más espacio arriba para etiquetas
+    plt.grid(True, alpha=0.05)
+    plt.legend()
+    if show: plt.show()
+
 def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
                        fondo="lin",show=True, config=None):    
