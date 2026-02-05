@@ -385,11 +385,11 @@ class XRFDeconv:
                 self.pcov = pcov 
     
             self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
+            par = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+            bkg_par = par["background"]
             if etapa == "bkg":
-                self.bkg_fit = core.continuum_bkg(self.E, popt, fondo=self.fondo)
+                self.bkg_fit = core.continuum_bkg(self.E, bkg_par, fondo=self.fondo)
             else:
-                par = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
-                bkg_par = par["background"]
                 self.bkg_fit = core.continuum_bkg(self.E, bkg_par, fondo=self.fondo)
                 self.I_fit = frx_wrapper(self.E, *popt) 
     
@@ -514,6 +514,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
