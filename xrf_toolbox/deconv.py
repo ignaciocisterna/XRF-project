@@ -258,7 +258,7 @@ class XRFDeconv:
             def frx_wrapper(E_val, *p_free):
                 p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
-                return core.FRX_model_sdd_general(E_val, params, self.t_live, config=self.config)
+                return core.FRX_model_sdd_general(E_val, params, self.t_live, fondo=self.fondo, config=self.config)
         
         
 
@@ -507,6 +507,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
