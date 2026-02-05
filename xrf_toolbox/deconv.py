@@ -17,13 +17,15 @@ from .config.manager import InstrumentConfig
 #------------------------------------------------------------------------------#
 
 class XRFDeconv:
-    def __init__(self, energy, counts, name="Muestra", fondo="lin", instrument="s2 picofox 200",
+    def __init__(self, energy, counts, name="Muestra", fondo="poly", grado_fondo=2, instrument="s2 picofox 200",
                 t_real=None, t_live=None, ajustar_tau=None):
         self.E_raw = energy
         self.I_raw = counts
         self.name = name
         self.fondo = fondo
-        self.offset = 12 if fondo == "lin" else 13
+        self.grado_fondo = grado_fondo
+        self.n_bkg = self.grado_fondo + 1
+        self.offset = 11 + self.grado_fondo
 
         self.config = InstrumentConfig.load(instrument)
         res = self.config.get_resolution_params()
@@ -128,23 +130,20 @@ class XRFDeconv:
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
                 # Fondo y Dispersión
-                n_bkg = 2 if self.fondo == "lin" else 3
-                mask_base += [1] * n_bkg # c0, c1...  
+                mask_base += [1] * self.n_bkg # c0, c1...  
                 mask_base += [0] * 4     # 4 áreas de dispersión
             elif etapa != "global" and etapa != "bkg": 
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
                 # Fondo y Dispersión
-                n_bkg = 2 if self.fondo == "lin" else 3
-                mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+                mask_base += [1] * (self.n_bkg + 4) # c0, c1... + 4 áreas de dispersión
             else: # global
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
                 # Fondo y Dispersión
-                n_bkg = 2 if self.fondo == "lin" else 3
-                mask_base += [1] * (n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+                mask_base += [1] * (self.n_bkg + 4) # c0, c1... + 4 áreas de dispersión
                 
         
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
@@ -193,7 +192,7 @@ class XRFDeconv:
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
-            if self.fondo != "lin": p_base.append(0)
+            if self.grado_fondo != 1: p_base += [1e-6] * (self.n_bkg - 2)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
@@ -248,7 +247,7 @@ class XRFDeconv:
         if etapa == "bkg":
             def frx_wrapper(E_val, *p_free):
                 p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
-                params = core.pack_params(p_full, self.elements, fondo=self.fondo)
+                params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 bkg_params = params["background"]
                 if self.fondo == "exp_poly":
                     # Directamente el polinomio (sin exp ni log, por eficiencia)
@@ -258,7 +257,7 @@ class XRFDeconv:
         else:
             def frx_wrapper(E_val, *p_free):
                 p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
-                params = core.pack_params(p_full, self.elements, fondo=self.fondo)
+                params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 return core.FRX_model_sdd_general(E_val, params, self.t_live, config=self.config)
         
         
@@ -276,6 +275,7 @@ class XRFDeconv:
             # Encontrar a qué parámetro real corresponde este p0_free[i]
             # Esto es clave para aplicar límites físicos
             p_idx = indices_libres[i]
+            limite_bkg = 6 + self.n_bkg
             
             if p_idx == 0: # Noise
                 lower.append(0.0035); upper.append(0.15)
@@ -295,18 +295,14 @@ class XRFDeconv:
                 # Asumiendo estructura: [Noise...Offset, c0, c1, c2, Ray, Com...]
                 # Los coeficientes suelen ser los primeros después del índice 5
                 
-                es_coef_fondo = (p_idx >= 6 and p_idx < (6 + (3 if self.fondo != "lin" else 2)))
-                
-                if es_coef_fondo and self.fondo == "exp_poly":
-                    # IMPORTANTE: Para exp_poly, permitimos negativos
-                    # Rango amplio [-100, 100] es suficiente para exponentes
-                    lower.append(-100.0)
-                    upper.append(100.0)
+                if 6 <= p_idx < limite_bkg:
+                    if self.fondo == "exp_poly":
+                        lower.append(-100.0); upper.append(100.0)
+                    else:
+                        lower.append(-np.inf); upper.append(np.inf)
                 else:
-                    # Para fondo lineal, Ray, Com, etc., queremos valores positivos
-                    # o pendientes negativas controladas.
-                    lower.append(-np.inf) # Permitimos pendiente negativa en lineal
-                    upper.append(np.inf)
+                    # Es Rayleigh o Compton
+                    lower.append(0.0); upper.append(np.inf)
             
             # --- Áreas de Elementos ---
             else: # Áreas de elementos
@@ -385,7 +381,7 @@ class XRFDeconv:
                 self.pcov = pcov 
     
             self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
-            opt_params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+            opt_params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
             if etapa == "bkg":
                 self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
             else:
@@ -397,21 +393,21 @@ class XRFDeconv:
                     mtr.graficar_fondo(self.E, self.I, self.bkg_fit, self.bkg_snip, fondo=self.fondo)
                 elif etapa == "K":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                        popt, self.p_actual, [etapa], fondo=self.fondo,
+                                        popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
                                         umbral_area_familia=0.5,
                                         umbral_ratio_linea=0.1, config=self.config)
                 elif etapa == "L":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                        popt, self.p_actual, [etapa], fondo=self.fondo,
+                                        popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
                                         config=self.config)
                 elif etapa == "M":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                        popt, self.p_actual, [etapa],  fondo=self.fondo,
+                                        popt, self.p_actual, [etapa],  n_bkg=self.n_bkg,
                                         umbral_area_familia=0,
                                         umbral_ratio_linea=0.1, config=self.config)
                 else: # global
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                        popt, self.p_actual, ["K", "L", "M"], fondo=self.fondo,
+                                        popt, self.p_actual, ["K", "L", "M"], n_bkg=self.n_bkg,
                                         umbral_ratio_linea=0.75, config=self.config)
 
         except Exception as e:
@@ -462,8 +458,8 @@ class XRFDeconv:
         self.run_stage_fit('global', graf=graf, roi_margin=roi_margin, tol=tol)
         stop_event.set()
         t.join() 
-        
-        self.p_dict = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+        # El diccionario final empaquetado
+        self.p_dict = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
 
 #------------------------------------------------------------------------------#
@@ -477,13 +473,13 @@ class XRFDeconv:
 
         mtr.generar_reporte_completo(self.E, self.I, self.I_fit, self.bkg_fit, 
                                         self.p_actual, self.elements, 
-                                        nombre_muestra=self.name, fondo=self.fondo,
+                                        nombre_muestra=self.name, n_bkg=self.n_bkg,
                                         config=self.config)
         if pdf:
             mtr.exportar_reporte_pdf(self.E, self.I, self.I_fit, self.bkg_fit, 
                                     self.p_actual, self.elements, 
                                     nombre_muestra=self.name, 
-                                    archivo=fname, fondo=self.fondo,
+                                    archivo=fname, n_bkg=self.n_bkg,
                                     config=self.config)
 
 #------------------------------------------------------------------------------#
@@ -492,16 +488,14 @@ class XRFDeconv:
         """Compara la resolución ajustada contra la nominal del equipo.
            Aplicar idealmente a ajuste completo.
         """
-        params = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+        params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
         mtr.check_resolution_health(params, self.config)
 
 #------------------------------------------------------------------------------#
 
     def generar_tabla_resultados(self):
-        res = []
-        params = self.p_dict # El diccionario final empaquetado
-        
-        for elem, data in params["elements"].items():
+        res = []        
+        for elem, data in self.p_dict["elements"].items():
             row = {"Elemento": elem}
             # Solo agregamos si el área es significativa (mayor a un umbral)
             if data["area_K"] > 0: row["Area_K"] = f"{data['area_K']:.2e}"
@@ -513,6 +507,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
