@@ -87,23 +87,18 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     plt.tight_layout()
     plt.show()
 
-def graficar_ajuste(E, I, I_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
+def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
                        fondo="lin",show=True, config=None):    
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
     final_params = core.pack_params(p_to_use, elementos, fondo=fondo)
-    bkg_coeffs = final_params["background"]
-    if fondo == "lin":
-        background = bkg_coeffs[0] + bkg_coeffs[1] * E
-    else:
-        background = bkg_coeffs[0] + bkg_coeffs[1] * E + bkg_coeffs[2] * E**2
     
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, I_fit, label='Modelo Ajustado', color='red', lw=1.5, alpha=0.8)
-    plt.plot(E, background, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
+    plt.plot(E, bkg_fit, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
 
     etiquetas_info = []
 
@@ -416,14 +411,14 @@ def check_resolution_health(params, config):
     ax_graph.legend()
     plt.show()
 
-def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, 
+def generar_reporte_completo(E, I, I_fit, bkg_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, 
                              fondo="lin", config=None):
     """
     Genera tabla de calidad por elemento y gráficos de diagnóstico de los peores ajustes.
     """
     print(f"\n{'='*25} REPORTE: {nombre_muestra} {'='*25}")
 
-    graficar_ajuste(E, I, I_fit, elementos, popt, fondo=fondo, umbral_ratio_linea=0.75, config=config)
+    graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, fondo=fondo, umbral_ratio_linea=0.75, config=config)
      
     _ = evaluar_ajuste_global(E, I, I_fit, len(popt))
   
@@ -533,13 +528,13 @@ def generar_reporte_completo(E, I, I_fit, popt, elementos, nombre_muestra="Muest
         params = core.pack_params(popt, elementos, fondo=fondo)
         check_resolution_health(params, config)
 
-def exportar_reporte_pdf(E, I, I_fit, popt, elementos, config, nombre_muestra="Muestra", 
+def exportar_reporte_pdf(E, I, I_fit, bkg_fit, popt, elementos, config, nombre_muestra="Muestra", 
                          archivo="Reporte_FRX.pdf", fondo="lin"):
     PAGE_SIZE = (11, 8.5)
     with PdfPages(archivo) as pdf:
         # --- PÁGINA 1: AJUSTE GLOBAL Y TABLA ---
         fig1 = plt.figure(figsize=PAGE_SIZE)
-        graficar_ajuste(E, I, I_fit, elementos, popt, figsize=PAGE_SIZE, show=False, fondo=fondo)
+        graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, figsize=PAGE_SIZE, show=False, fondo=fondo)
         plt.subplots_adjust(bottom=0.38)
         ax_table = fig1.add_axes([0.1, 0.05, 0.8, 0.25])
         ax_table.axis('off')
