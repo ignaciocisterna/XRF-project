@@ -87,17 +87,15 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     plt.tight_layout()
     plt.show()
 
-def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="lin"):
+def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="poly"):
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, bkg_fit, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
     plt.plot(E, bkg_snip, label='Fondo SNIP', color='darkblue', alpha=0.6, linestyle='--')
     plt.xlabel('Energía (keV)')
     plt.ylabel('Cuentas')
-    if fondo == "lin":
-        modelo_fondo = "Lineal"
-    elif fondo == "cuad":
-        modelo_fondo = "Cuadrático"
+    if fondo == "poly":
+        modelo_fondo = "Polinomial"
     elif fondo == "exp_poly":
         modelo_fondo = "Exponencial Polinomial"
     plt.title(f'Ajuste de Fondo Continuo con modelo {modelo_fondo}')
@@ -109,11 +107,11 @@ def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="l
 
 def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
-                       fondo="lin",show=True, config=None):    
+                       n_bkg=2,show=True, config=None):    
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
-    final_params = core.pack_params(p_to_use, elementos, fondo=fondo)
+    final_params = core.pack_params(p_to_use, elementos, n_bkg=n_bkg)
     
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
@@ -432,13 +430,13 @@ def check_resolution_health(params, config):
     plt.show()
 
 def generar_reporte_completo(E, I, I_fit, bkg_fit, popt, elementos, nombre_muestra="Muestra", n_top=3, 
-                             fondo="lin", config=None):
+                             n_bkg=2, config=None):
     """
     Genera tabla de calidad por elemento y gráficos de diagnóstico de los peores ajustes.
     """
     print(f"\n{'='*25} REPORTE: {nombre_muestra} {'='*25}")
 
-    graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, fondo=fondo, umbral_ratio_linea=0.75, config=config)
+    graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, n_bkg=n_bkg, umbral_ratio_linea=0.75, config=config)
      
     _ = evaluar_ajuste_global(E, I, I_fit, len(popt))
   
@@ -545,16 +543,16 @@ def generar_reporte_completo(E, I, I_fit, bkg_fit, popt, elementos, nombre_muest
     detectar_elementos_omitidos(E, I, I_fit, output=False)
 
     if config:
-        params = core.pack_params(popt, elementos, fondo=fondo)
+        params = core.pack_params(popt, elementos, n_bkg=n_bkg)
         check_resolution_health(params, config)
 
 def exportar_reporte_pdf(E, I, I_fit, bkg_fit, popt, elementos, config, nombre_muestra="Muestra", 
-                         archivo="Reporte_FRX.pdf", fondo="lin"):
+                         archivo="Reporte_FRX.pdf", n_bkg=2):
     PAGE_SIZE = (11, 8.5)
     with PdfPages(archivo) as pdf:
         # --- PÁGINA 1: AJUSTE GLOBAL Y TABLA ---
         fig1 = plt.figure(figsize=PAGE_SIZE)
-        graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, figsize=PAGE_SIZE, show=False, fondo=fondo)
+        graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, figsize=PAGE_SIZE, show=False, n_bkg=n_bkg)
         plt.subplots_adjust(bottom=0.38)
         ax_table = fig1.add_axes([0.1, 0.05, 0.8, 0.25])
         ax_table.axis('off')
