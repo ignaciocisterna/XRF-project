@@ -192,7 +192,7 @@ class XRFDeconv:
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
-            if self.grado_fondo != 1: p_base += [1e-6] * (self.n_bkg - 2)
+            if self.grado_fondo != 1: p_base += [0.0] * (self.n_bkg - 2)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
@@ -507,6 +507,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
