@@ -308,22 +308,21 @@ def is_excitable(Z, family, config):
         return False
 
 # Modelo Fondo continuo
-def continuum_bkg(E, params, fondo="lin"):
+def continuum_bkg(E, params, fondo="poly"):
     """ Función del fondo ajustable """
-    bkg_coeffs = params["background"]
-    if fondo == "lin" or fondo == "cuad":
-        # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
-        background = np.polyval(bkg_coeffs[::-1], E)
+    bkg_coeffs = params["background"] # Ya viene con el largo correcto
+    
+    # Calculamos el polinomio base (funciona para cualquier grado)
+    poly = np.polyval(bkg_coeffs[::-1], E)
+    
+    if fondo == "poly":
+        return poly
     elif fondo == "exp_poly":
-        poly = np.polyval(bkg_coeffs[::-1], E)
-        background = np.exp(np.clip(poly, -700, 700))
-    else:
-        raise ValueError("Fondo no soportado: fondo debe ser 'lin', 'cuad' o 'exp_poly'")
-    return background
+        return np.exp(np.clip(poly, -700, 700))
 
 
 # Modelo Espectro
-def FRX_model_sdd_general(E_raw, params, live_time, fondo="lin", config=None):
+def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación de Mo y los efectos instrumentales están absorbidos
@@ -415,7 +414,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="lin", config=None):
 # --- TRATAMIENTO DE PARÁMETROS ---
 
 # Vectorización de parámetros
-def pack_params(p, elements, fondo="lin"):
+def pack_params(p, elements, n_bkg=2):
     """
     Empaqueta los parámetros en un diccionario, adaptándose al modelo de fondo.
     """
@@ -424,24 +423,17 @@ def pack_params(p, elements, fondo="lin"):
         "tau_pileup": p[3],
         "gain_corr": p[4], "offset_corr": p[5]
     }
+    
+    idx_start = 6
+    idx_end = idx_start + n_bkg
+    
+    params["background"] = p[idx_start:idx_end]
 
-    if fondo == "lin":
-        params["background"] = (p[6], p[7])
-        params["scat_areas"] = {
-            "ray_K": p[8], "com_K": p[9], 
-            "ray_L": p[10], "com_L": p[11]
+    params["scat_areas"] = {
+            "ray_K": p[idx_end], "com_K": p[idx_end + 1], 
+            "ray_L": p[idx_end + 2], "com_L": p[idx_end + 3]
         }
-        idx = 12
-    elif fondo == "cuad" or fondo == "exp_poly":
-        params["background"] = (p[6], p[7], p[8])
-        params["scat_areas"] = {
-            "ray_K": p[9], "com_K": p[10], 
-            "ray_L": p[11], "com_L": p[12]
-        }
-        idx = 13
-    else:
-        raise ValueError("Fondo no soportado, el fondo debe ser 'lin', 'cuad' o 'exp_poly'")
-
+    idx = idx_end + 4
     # Empaquetado de elementos (común a ambos)
     params["elements"] = {}
     for elem in elements:
@@ -467,6 +459,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
