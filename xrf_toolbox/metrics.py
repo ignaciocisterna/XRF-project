@@ -87,7 +87,7 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     plt.tight_layout()
     plt.show()
 
-def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="poly"):
+def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="poly", grado_fondo=2):
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, bkg_fit, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
@@ -98,7 +98,7 @@ def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="p
         modelo_fondo = "Polinomial"
     elif fondo == "exp_poly":
         modelo_fondo = "Exponencial Polinomial"
-    plt.title(f'Ajuste de Fondo Continuo con modelo {modelo_fondo}')
+    plt.title(f'Ajuste de Fondo Continuo con modelo {modelo_fondo} de grado {grado_fondo}')
     #plt.xlim(E.min(), E.max()*1.05)
     #plt.ylim(0, max(I) * 2) # Más espacio arriba para etiquetas
     plt.grid(True, alpha=0.05)
