@@ -314,11 +314,11 @@ def continuum_bkg(E, params, fondo="lin"):
     if fondo == "lin" or fondo == "cuad":
         # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
         background = np.polyval(bkg_coeffs[::-1], E)
-
     elif fondo == "exp_poly":
         poly = np.polyval(bkg_coeffs[::-1], E)
         background = np.exp(np.clip(poly, -700, 700))
-        
+    else:
+        raise ValueError("Fondo no soportado: fondo debe ser 'lin', 'cuad' o 'exp_poly'")
     return background
 
 
@@ -467,6 +467,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
