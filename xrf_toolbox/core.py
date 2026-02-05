@@ -317,7 +317,7 @@ def continuum_bkg(E, params, fondo="lin"):
 
     elif fondo == "exp_poly":
         poly = np.polyval(bkg_coeffs[::-1], E)
-        background = np.clip(poly, -700, 700)
+        background = np.exp(np.clip(poly, -700, 700))
         
     return background
 
@@ -467,6 +467,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
