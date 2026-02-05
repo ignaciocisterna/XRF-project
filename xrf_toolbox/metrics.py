@@ -87,10 +87,11 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
     plt.tight_layout()
     plt.show()
 
-def graficar_fondo(E, I, bkg_fit, figsize=(12, 8), show=True, fondo="lin"):
+def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="lin"):
     if show: plt.figure(figsize=figsize)
     plt.plot(E, I, label='Datos Experimentales', color='grey', alpha=0.4)
     plt.plot(E, bkg_fit, label='Fondo Modelo', color='orange', alpha=0.8, linestyle='--')
+    plt.plot(E, bkg_snip, label='Fondo SNIP', color='darkblue', alpha=0.6, linestyle='--')
     plt.xlabel('Energía (keV)')
     plt.ylabel('Cuentas')
     if fondo == "lin":
