@@ -324,7 +324,7 @@ class XRFDeconv:
                                        target_y, 
                                        p0=p0_free, 
                                        bounds=bounds,
-                                       method='trf' # Altamente recomendado para bounds
+                                       method='trf', # Altamente recomendado para bounds
                                        xtol=tol, 
                                        ftol=tol
                                        )
@@ -514,6 +514,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
