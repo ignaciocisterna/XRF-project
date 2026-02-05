@@ -308,12 +308,17 @@ def is_excitable(Z, family, config):
         return False
 
 # Modelo Fondo continuo
-def conti_bkg(E, params, fondo="lin"):
+def continuum_bkg(E, params, fondo="lin"):
     """ Función del fondo ajustable """
+    bkg_coeffs = params["background"]
     if fondo == "lin" or fondo == "cuad":
-        bkg_coeffs = params["background"]
         # np.polyval usa el orden [cn, ..., c1, c0], así que invertimos la lista
         background = np.polyval(bkg_coeffs[::-1], E)
+
+    elif fondo == "exp_poly":
+        poly = np.polyval(bkg_coeffs[::-1], E)
+        background = np.clip(poly, -700, 700)
+        
     return background
 
 
@@ -402,7 +407,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="lin", config=None):
             spectrum += compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle) * get_efficiency(E_com, config)
 
    # --- FONDO DINÁMICO ---
-    background = conti_bkg(E, params, fondo=fondo)
+    background = continuum_bkg(E, params, fondo=fondo)
     
     # spectrum es la suma de picos calculada previamente
     return spectrum + background
@@ -427,7 +432,7 @@ def pack_params(p, elements, fondo="lin"):
             "ray_L": p[10], "com_L": p[11]
         }
         idx = 12
-    elif fondo == "cuad":
+    elif fondo == "cuad" or fondo == "exp_poly":
         params["background"] = (p[6], p[7], p[8])
         params["scat_areas"] = {
             "ray_K": p[9], "com_K": p[10], 
@@ -435,7 +440,7 @@ def pack_params(p, elements, fondo="lin"):
         }
         idx = 13
     else:
-        raise ValueError("Fondo no soportado, el fondo debe ser 'lin' o 'cuad'")
+        raise ValueError("Fondo no soportado, el fondo debe ser 'lin', 'cuad' o 'exp_poly'")
 
     # Empaquetado de elementos (común a ambos)
     params["elements"] = {}
@@ -462,6 +467,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
