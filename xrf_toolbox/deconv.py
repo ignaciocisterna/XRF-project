@@ -390,7 +390,7 @@ class XRFDeconv:
             else:
                 par = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
                 bkg_par = par["background"]
-                self.bkg_fit = (self.E, bkg_par, fondo=self.fondo)
+                self.bkg_fit = core.continuum_bkg(self.E, bkg_par, fondo=self.fondo)
                 self.I_fit = frx_wrapper(self.E, *popt) 
     
             if graf:
@@ -514,6 +514,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
