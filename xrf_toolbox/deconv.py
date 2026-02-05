@@ -321,7 +321,7 @@ class XRFDeconv:
                 y_target = np.log(np.maximum(self.bkg_snip, 1e-5)) if self.fondo == "exp_poly" else self.bkg_snip
                 popt, pcov = curve_fit(frx_wrapper, 
                                        self.E, 
-                                       target_y, 
+                                       y_target, 
                                        p0=p0_free, 
                                        bounds=bounds,
                                        method='trf', # Altamente recomendado para bounds
@@ -514,6 +514,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
