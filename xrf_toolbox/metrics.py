@@ -640,6 +640,7 @@ def exportar_reporte_pdf(E, I, I_fit, bkg_fit, popt, elementos, config, nombre_m
         
         # Obtenemos los datos de salud
         res_mn_nom = config.res_mn_ka
+        final_params = core.pack_params(p_to_use, elementos, n_bkg=n_bkg)
         s_mn = np.sqrt(final_params['noise']**2 + final_params['fano'] * final_params['epsilon'] * 5.895)
         res_mn_fit = (s_mn * 2.355) * 1000
         
