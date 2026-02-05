@@ -53,7 +53,8 @@ class XRFDeconv:
         # Atributos que se llenarán en el proceso
         self.E, self.I = None, None
         self.I_net = None
-        self.bkg = None
+        self.bkg_snip = None
+        self.bkg_fit = None
         self.elements = []
         self.p_actual = None
         self.pcov = None
@@ -71,18 +72,18 @@ class XRFDeconv:
     def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
                            permitir_solapamientos=False, todos=False):
         """Calcula SNIP y detecta elementos."""
-        self.bkg = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
+        self.bkg_snip = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
                                
-        self.I_net = self.I - self.bkg
+        self.I_net = self.I - self.bkg_snip
         self.I_net[self.I_net < 0] = 0 # Limpieza de valores negativos
                                
-        self.elements = prc.detectar_elementos(self.E, self.I, self.bkg, 
+        self.elements = prc.detectar_elementos(self.E, self.I, self.bkg_snip, 
                                                manual_elements=manual,
                                                ignorar=ignore,
                                                permitir_solapamientos=permitir_solapamientos, 
                                                todos=todos)
         if graf:
-            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg)
+            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip)
         if verbose:
             print(f"[{self.name}] Reporte de Detección:")
             print("Elemento ---------- Status")
@@ -122,7 +123,15 @@ class XRFDeconv:
             """
             n_elem = len(self.elements)
 
-            if etapa != "global": 
+            if etapa == "bkg":
+                # 1. Parte Base
+                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+                mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
+                # Fondo y Dispersión
+                n_bkg = 2 if self.fondo == "lin" else 3
+                mask_base += [1] * n_bkg # c0, c1...  
+                mask_base += [0] * 4     # 4 áreas de dispersión
+            elif etapa != "global" and etapa != "bkg": 
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [1, 1, 1, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
@@ -164,9 +173,17 @@ class XRFDeconv:
     
     def get_p0(self, etapa, mask=None):
         """Genera la semilla base según el modelo de fondo y etapa actual."""
-        if etapa == "K":
-            c0_init = np.min(self.bkg)
-            c1_init = (self.bkg[-1] - self.bkg[0]) / (self.E[-1] - self.E[0])
+        if etapa == "bkg":
+            if self.fondo == "exp_poly":
+                # Trabajamos en escala Logarítmica para las semillas
+                # Sumamos 1e-5 para evitar log(0) si hay ceros
+                log_bkg = np.log(np.maximum(self.bkg_snip, 1e-5))
+                
+                c0_init = np.mean(log_bkg) # Promedio del log es más seguro
+                c1_init = 0 # Empezamos plano para dejar que el fit encuentre la pendiente
+            else:
+                c0_init = np.min(self.bkg_snip)
+                c1_init = (self.bkg_snip[-1] - self.bkg_snip[0]) / (self.E[-1] - self.E[0])
 
             # Semillas de dispersión basadas en el máximo del espectro
             max_counts = np.max(self.I)
@@ -176,18 +193,24 @@ class XRFDeconv:
                 1.0, 0.0,    # gain, offset
                 c0_init, c1_init
             ]
-            if self.fondo == "cuad": p_base.append(1e-2)
+            if self.fondo != "lin": p_base.append(0)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
 
+            for elem in self.elements:
+                p_base += [0, 0, 0]    # K, L, M
+
+        elif etapa == "K":
+            # Para K partimos de lo que ya tenemos preajustado del fondo
+            p_base = self.p_actual.copy()
             # Inicializar áreas de elementos detectados
-            if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg, 0)
+            if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg_snip, 0)
             area_init_gral = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
             for elem in self.elements:
                 area_init = area_init_gral * self.validar_familia(elem, "K")
-                p_base += [area_init, 0, 0]    # K, L, M
+                p_base += [area_init, 0, 0]
 
         else:
             # Para L, M o global, partimos de lo que ya tenemos ajustado
@@ -216,16 +239,27 @@ class XRFDeconv:
     def run_stage_fit(self, etapa, graf=False, roi_margin=0.4, tol=1e-5):
         free_mask = self.get_mask(etapa)
 
-        # Si es la primera etapa (K), inicializamos p_actual con p0 completo
-        if etapa == "K" or self.p_actual is None:
-            self.p_actual = self.get_p0("K")
+        # Si es la primera etapa (bkg), inicializamos p_actual con p0 completo
+        if etapa == "bkg" or self.p_actual is None:
+            self.p_actual = self.get_p0("bkg")
 
         p0_free = self.get_p0(etapa, free_mask)
 
-        def frx_wrapper(E_val, *p_free):
-            p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
-            params = core.pack_params(p_full, self.elements, fondo=self.fondo)
-            return core.FRX_model_sdd_general(E_val, params, self.t_live, config=self.config)
+        if etapa == "bkg":
+            def frx_wrapper(E_val, *p_free):
+                p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
+                params = core.pack_params(p_full, self.elements, fondo=self.fondo)
+                bkg_params = params["background"]
+                if self.fondo == "exp_poly":
+                    # Directamente el polinomio (sin exp ni log, por eficiencia)
+                    return np.polyval(bkg_params[::-1], E_val)
+                else:
+                    return core.continuum_bkg(E_val, bkg_params, fondo=self.fondo)
+        else:
+            def frx_wrapper(E_val, *p_free):
+                p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
+                params = core.pack_params(p_full, self.elements, fondo=self.fondo)
+                return core.FRX_model_sdd_general(E_val, params, self.t_live, config=self.config)
         
         
 
@@ -255,18 +289,46 @@ class XRFDeconv:
                 lower.append(0.98);   upper.append(1.02) # +/- 2% ganancia
             elif p_idx == 5: # Offset Corr
                 lower.append(-0.05);  upper.append(0.05) # +/- 50 eV shift
-            elif p_idx < self.offset: # Resto de globales (bkg, scat)
-                lower.append(0.0); upper.append(np.inf)
+            # --- Parámetros de Fondo y Dispersión (Indices 6 hasta offset) ---
+            elif p_idx < self.offset:
+                # Detectamos si es un coeficiente del polinomio de fondo
+                # Asumiendo estructura: [Noise...Offset, c0, c1, c2, Ray, Com...]
+                # Los coeficientes suelen ser los primeros después del índice 5
+                
+                es_coef_fondo = (p_idx >= 6 and p_idx < (6 + (3 if self.fondo != "lin" else 2)))
+                
+                if es_coef_fondo and self.fondo == "exp_poly":
+                    # IMPORTANTE: Para exp_poly, permitimos negativos
+                    # Rango amplio [-100, 100] es suficiente para exponentes
+                    lower.append(-100.0)
+                    upper.append(100.0)
+                else:
+                    # Para fondo lineal, Ray, Com, etc., queremos valores positivos
+                    # o pendientes negativas controladas.
+                    lower.append(-np.inf) # Permitimos pendiente negativa en lineal
+                    upper.append(np.inf)
+            
+            # --- Áreas de Elementos ---
             else: # Áreas de elementos
                 lower.append(0.0); upper.append(techo_cuentas)
         
         bounds = (lower, upper)
-
-        roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
+        if etapa != "bkg":
+            roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
         try:
-            if etapa in ["K", "L"]:
-                
+            if etapa == "bkg":
+                y_target = np.log(np.maximum(self.bkg_snip, 1e-5)) if self.fondo == "exp_poly" else self.bkg_snip
+                popt, pcov = curve_fit(frx_wrapper, 
+                                       self.E, 
+                                       target_y, 
+                                       p0=p0_free, 
+                                       bounds=bounds,
+                                       method='trf' # Altamente recomendado para bounds
+                                       xtol=tol, 
+                                       ftol=tol
+                                       )
+            elif etapa in ["K", "L"]:    
                 popt, pcov = curve_fit(frx_wrapper, 
                                       self.E[roi_mask], 
                                       self.I[roi_mask], 
@@ -323,25 +385,33 @@ class XRFDeconv:
                 self.pcov = pcov 
     
             self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
-            self.I_fit = frx_wrapper(self.E, *popt) 
+            if etapa == "bkg":
+                self.bkg_fit = frx_wrapper(self.E, *popt)
+            else:
+                par = core.pack_params(self.p_actual, self.elements, fondo=self.fondo)
+                bkg_par = par["background"]
+                self.bkg_fit = (self.E, bkg_par, fondo=self.fondo)
+                self.I_fit = frx_wrapper(self.E, *popt) 
     
             if graf:
-                if etapa == "K":
-                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                if etapa == "bkg":
+                    mtr.graficar_fondo(self.E, self.I, self.bkg_fit, fondo=self.fondo)
+                elif etapa == "K":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, [etapa], fondo=self.fondo,
                                         umbral_area_familia=0.5,
                                         umbral_ratio_linea=0.1, config=self.config)
                 elif etapa == "L":
-                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, [etapa], fondo=self.fondo,
                                         config=self.config)
                 elif etapa == "M":
-                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, [etapa],  fondo=self.fondo,
                                         umbral_area_familia=0,
                                         umbral_ratio_linea=0.1, config=self.config)
                 else: # global
-                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.elements, 
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, ["K", "L", "M"], fondo=self.fondo,
                                         umbral_ratio_linea=0.75, config=self.config)
 
@@ -363,6 +433,16 @@ class XRFDeconv:
     def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-6):
         """Ejecuta el pipeline completo de ajuste secuencial."""
         print(" > Iniciando Deconvolución:")
+        stop_event = threading.Event()
+        t = threading.Thread(
+            target=self.animacion_carga,
+            args=(stop_event, "  > Preajustando Fondo Continuo")
+        )
+        t.start()
+        self.run_stage_fit('bkg', graf=graf, roi_margin=roi_margin, tol=tol)
+        stop_event.set()
+        t.join()
+        
         for etapa in ["K", "L", "M"]:
             stop_event = threading.Event()
             t = threading.Thread(
@@ -396,12 +476,12 @@ class XRFDeconv:
             
         fname = filename if filename else f"Reporte_{self.name}.pdf"
 
-        mtr.generar_reporte_completo(self.E, self.I, self.I_fit, 
+        mtr.generar_reporte_completo(self.E, self.I, self.I_fit, self.bkg_fit, 
                                         self.p_actual, self.elements, 
                                         nombre_muestra=self.name, fondo=self.fondo,
                                         config=self.config)
         if pdf:
-            mtr.exportar_reporte_pdf(self.E, self.I, self.I_fit, 
+            mtr.exportar_reporte_pdf(self.E, self.I, self.I_fit, self.bkg_fit, 
                                     self.p_actual, self.elements, 
                                     nombre_muestra=self.name, 
                                     archivo=fname, fondo=self.fondo,
@@ -434,6 +514,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
