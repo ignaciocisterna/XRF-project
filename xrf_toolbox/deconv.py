@@ -207,9 +207,11 @@ class XRFDeconv:
             if self.I_net is None: self.I_net = np.maximum(self.I - self.bkg_snip, 0)
             area_init_gral = np.trapezoid(self.I_net, self.E) / len(self.elements)
 
+            idx = self.offset
             for elem in self.elements:
                 area_init = area_init_gral * self.validar_familia(elem, "K")
-                p_base += [area_init, 0, 0]
+                p_base[idx] = area_init
+                idx += 3
 
         else:
             # Para L, M o global, partimos de lo que ya tenemos ajustado
@@ -507,6 +509,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
