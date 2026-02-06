@@ -554,7 +554,7 @@ class XRFDeconv:
         stop_event.set()
         t.join()
         # --- BIFURCACIÓN DEL PIPELINE ---
-        if mode == "EDXRF:
+        if mode == "EDXRF":
             stop_event = threading.Event()
             t = threading.Thread(
                 target=self.animacion_carga,
@@ -645,6 +645,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
