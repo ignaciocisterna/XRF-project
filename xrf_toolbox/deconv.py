@@ -252,8 +252,8 @@ class XRFDeconv:
                 if self.fondo == "exp_poly":
                     # Directamente el polinomio (sin exp ni log, por eficiencia)
                     return np.polyval(bkg_params[::-1], E_val)
-                else:
-                    return core.continuum_bkg(E_val, bkg_params, fondo=self.fondo)
+                elif self.fondo == "poly":
+                    return core.continuum_bkg(E_val, params, fondo=self.fondo)
         else:
             def frx_wrapper(E_val, *p_free):
                 p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
@@ -507,6 +507,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
