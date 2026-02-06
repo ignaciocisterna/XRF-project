@@ -110,7 +110,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
                        n_bkg=2,show=True, config=None):    
     if shells == ["resol"]:
         resol = True
-        shells = "K"
+        shells = ["K", "L", "M"] 
     else:
         resol = False
     
