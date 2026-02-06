@@ -290,7 +290,7 @@ def evaluar_ajuste_global(E, I, I_fit, n_parametros, pcov=None, verbose=True):
 
     return {"chi": chi_reducido, "fom": fom, "r2": r2, "perr": perr}
 
-def evaluar_elemento_local(elem, E, I, I_fit, padding=0.2):
+def evaluar_elemento_local(elem, E, I, I_fit, padding=0.3):
     """
     Calcula métricas de ajuste en la Región de Interés (ROI) de un elemento.
     """
