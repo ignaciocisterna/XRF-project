@@ -72,18 +72,23 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
    
     def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
-                           permitir_solapamientos=False, todos=False):
+                           permitir_solapamientos=False, todos=False, autodet=True):
         """Calcula SNIP y detecta elementos."""
         self.bkg_snip = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
                                
         self.I_net = self.I - self.bkg_snip
         self.I_net[self.I_net < 0] = 0 # Limpieza de valores negativos
-                               
-        self.elements = prc.detectar_elementos(self.E, self.I, self.bkg_snip, 
-                                               manual_elements=manual,
-                                               ignorar=ignore,
-                                               permitir_solapamientos=permitir_solapamientos, 
-                                               todos=todos)
+        if autodet:                 
+            self.elements = prc.detectar_elementos(self.E, self.I, self.bkg_snip, 
+                                                   manual_elements=manual,
+                                                   ignorar=ignore,
+                                                   permitir_solapamientos=permitir_solapamientos, 
+                                                   todos=todos)
+        else: 
+            if manual: 
+                self.elements = manual
+            else:
+                raise ValueError("Debe ingresarse una lista manual de elementos si la autodetección está desactivada")
         if graf:
             mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip)
         if verbose:
@@ -646,6 +651,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
