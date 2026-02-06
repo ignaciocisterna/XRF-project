@@ -208,7 +208,7 @@ class XRFDeconv:
                 mask_base += [0] * self.n_bkg # c0, c1...  
                 if getattr(self.config, 'mode', 'EDXRF') == "TXRF":
                      mask_base += [1] * 4    # 4 áreas de dispersión
-                 else:
+                else:
                      mask_base += [0] * 4    # 4 áreas de dispersión
                 
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
@@ -646,6 +646,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
