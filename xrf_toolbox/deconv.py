@@ -114,6 +114,49 @@ class XRFDeconv:
             return 0
         except:
             return 0
+#------------------------------------------------------------------------------#
+
+    def identify_major_element(self):
+        """
+        Identifica heurísticamente el elemento con mayor intensidad en el espectro raw
+        para usarlo como ancla de calibración.
+        """
+        max_counts = -1
+        major_elem = None
+        major_line = "K" # Por defecto
+
+        for elem in self.elements:
+            # Obtenemos Z
+            Z = xl.SymbolToAtomicNumber(elem)
+            
+            # Revisamos K alpha primero
+            try:
+                if core.is_excitable(Z, "K", self.config):
+                    line_E = xl.LineEnergy(Z, xl.KA1_LINE)
+                    # Integramos un ROI pequeño de +/- 0.15 keV alrededor
+                    mask = (self.E > line_E - 0.15) & (self.E < line_E + 0.15)
+                    counts = np.sum(self.I[mask])
+                    if counts > max_counts:
+                        max_counts = counts
+                        major_elem = elem
+                        major_line = "K"
+            except: pass
+
+            # Revisamos L alpha si es pesado (ej. Pb, Hg) o si K no existe/es muy alta
+            try:
+                if core.is_excitable(Z, "L", self.config):
+                    line_E = xl.LineEnergy(Z, xl.LA1_LINE)
+                    mask = (self.E > line_E - 0.15) & (self.E < line_E + 0.15)
+                    counts = np.sum(self.I[mask])
+                    # Le damos un peso extra si es L porque suelen tener menos yield, 
+                    # pero aquí nos importa la altura cruda.
+                    if counts > max_counts:
+                        max_counts = counts
+                        major_elem = elem
+                        major_line = "L"
+            except: pass
+            
+        return major_elem, major_line
 
 #------------------------------------------------------------------------------#
 
@@ -133,33 +176,61 @@ class XRFDeconv:
                 mask_base += [1] * self.n_bkg # c0, c1...  
                 mask_base += [0] * 4     # 4 áreas de dispersión
             elif etapa == "scat":
+                # EDXRF CALIBRATION MODE
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
                 # Fondo y Dispersión
                 mask_base += [0] * self.n_bkg # c0, c1...  
                 mask_base += [1] * 4     # 4 áreas de dispersión
+            elif etapa == "resol":
+                # TXRF CALIBRATION MODE
+                # 1. Parte Base
+                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+                mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
+                # Fondo y Dispersión
+                mask_base += [0] * self.n_bkg # c0, c1...  
+                mask_base += [0] * 4     # 4 áreas de dispersión
             elif etapa == "global": 
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
                 # Fondo y Dispersión
-                mask_base += [1] * (self.n_bkg + 4) # c0, c1... + 4 áreas de dispersión
+                if getattr(self.config, 'mode', 'EDXRF') == "TXRF":    # Cambiar luego después de testeo
+                     mask_base += [1] * 4
+                 else:
+                     mask_base += [1] * 4
             else: # K, L, M
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
                 mask_base = [0, 0, 0, (1 if self.free_tau else 0), 0, 0] # tau dependiente de free_tau
                 # Fondo y Dispersión
                 mask_base += [0] * self.n_bkg # c0, c1...  
-                mask_base += [0] * 4     # 4 áreas de dispersión
+                if getattr(self.config, 'mode', 'EDXRF') == "TXRF":
+                     mask_base += [1] * 4
+                 else:
+                     mask_base += [0] * 4
                 
             # 2. Parte de Elementos [Area_K, Area_L, Area_M]
             element_masks = []
         
+            # Identificamos anclas para modo resol
+            major_elem, major_fam = (None, None)
+            if etapa == "resol":
+                major_elem, major_fam = self.identify_major_element()
+            
             for elem in self.elements:
                 slots = [0, 0, 0] # [K, L, M]
+    
+                if etapa == "resol":
+                    # Solo activamos Si y el Elemento Mayoritario
+                    if elem == "Si":
+                        slots[0] = 1 # Asumimos Si-K siempre
+                    elif elem == major_elem:
+                        if major_fam == "K": slots[0] = 1
+                        elif major_fam == "L": slots[1] = 1
                 
-                if etapa == "K":
+                elif etapa == "K":
                     slots[0] = self.validar_familia(elem, "K")
                 elif etapa == "L":
                     slots[1] = self.validar_familia(elem, "L")
@@ -202,11 +273,32 @@ class XRFDeconv:
             if self.grado_fondo != 1: p_base += [0.0] * (self.n_bkg - 2)
             
             # [Ray_K, Com_K, Ray_L, Com_L]
-            p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
-
+            is_txrf = getattr(self.config, 'mode', 'EDXRF') == "TXRF"
+            if is_txrf:
+                 p_base += [0.0, 0.0, 0.0, 0.0] 
+             else:
+                 p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
+                 
             for elem in self.elements:
                 p_base += [0, 0, 0]    # K, L, M
 
+        elif etapa == "resol":
+             # Copiamos lo actual
+             p_base = self.p_actual.copy()
+             
+             # Inyectamos semillas FUERTES para Si y Major Element
+             # para asegurar que el fit no se pierda buscando gain/offset
+             major_elem, major_fam = self.identify_major_element()
+             
+             idx = self.offset
+             for elem in self.elements:
+                 if elem == "Si":
+                     p_base[idx] = np.max(self.I) * 0.5 # Semilla Si-K
+                 elif elem == major_elem:
+                     offset_fam = 0 if major_fam == "K" else 1
+                     p_base[idx + offset_fam] = np.max(self.I) # Semilla al pico más alto
+                 idx += 3
+                 
         elif etapa == "K":
             # Para K partimos de lo que ya tenemos preajustado del fondo
             p_base = self.p_actual.copy()
@@ -318,7 +410,7 @@ class XRFDeconv:
                 lower.append(0.0); upper.append(techo_cuentas)
         
         bounds = (lower, upper)
-        if etapa != "bkg" and etapa != "scat":
+        if etapa not in ["bkg", "scat", "resol"]:
             roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
         try:
@@ -333,7 +425,7 @@ class XRFDeconv:
                                        xtol=tol, 
                                        ftol=tol
                                        )
-            elif etapa == "scat":
+            elif etapa == "scat" or etapa == "resol":
                 popt, pcov = curve_fit(frx_wrapper, 
                                        self.E, 
                                        self.I,
@@ -448,8 +540,11 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
 
     def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-6):
-        """Ejecuta el pipeline completo de ajuste secuencial."""
-        print(" > Iniciando Deconvolución:")
+        """Ejecuta el pipeline completo de ajuste secuencial según el modo del instrumento."""
+        mode = getattr(self.config, 'mode', 'EDXRF') # Default a EDXRF por seguridad
+        
+        print(f" > Iniciando Deconvolución (Modo: {mode}):")
+        # Preajuste de Fondo
         stop_event = threading.Event()
         t = threading.Thread(
             target=self.animacion_carga,
@@ -459,17 +554,29 @@ class XRFDeconv:
         self.run_stage_fit('bkg', graf=graf, roi_margin=roi_margin, tol=tol)
         stop_event.set()
         t.join()
+        # --- BIFURCACIÓN DEL PIPELINE ---
+        if mode == "EDXRF:
+            stop_event = threading.Event()
+            t = threading.Thread(
+                target=self.animacion_carga,
+                args=(stop_event, "  > Ajustando Dispersión (Rayleigh/Compton)")
+            )
+            t.start()
+            self.run_stage_fit('scat', graf=graf, roi_margin=roi_margin, tol=tol)
+            stop_event.set()
+            t.join()
 
-        stop_event = threading.Event()
-        t = threading.Thread(
-            target=self.animacion_carga,
-            args=(stop_event, "  > Ajustando Peaks Dispersivos de Rayleigh y Compton")
-        )
-        t.start()
-        self.run_stage_fit('scat', graf=graf, roi_margin=roi_margin, tol=tol)
-        stop_event.set()
-        t.join()
-        
+        elif mode == "TXRF":
+            stop_event = threading.Event()
+            t = threading.Thread(
+                target=self.animacion_carga,
+                args=(stop_event, "  > Calibrando Energía (Si + Mayoritario)")
+            )
+            t.start()
+            self.run_stage_fit('resol', graf=graf, roi_margin=roi_margin, tol=tol)
+            stop_event.set()
+            t.join()
+        # Ajustes de capas K, L y M
         for etapa in ["K", "L", "M"]:
             stop_event = threading.Event()
             t = threading.Thread(
@@ -480,7 +587,7 @@ class XRFDeconv:
             self.run_stage_fit(etapa, graf=graf, roi_margin=roi_margin, tol=tol)
             stop_event.set()
             t.join()
-        
+        # Refinamiento Global
         stop_event = threading.Event()
         t = threading.Thread(
             target=self.animacion_carga,
@@ -539,6 +646,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
