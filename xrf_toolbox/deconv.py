@@ -312,106 +312,106 @@ class XRFDeconv:
         if etapa != "bkg":
             roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
-        #try:
-        if etapa == "bkg":
-            y_target = np.log(np.maximum(self.bkg_snip, 1e-5)) if self.fondo == "exp_poly" else self.bkg_snip
-            popt, pcov = curve_fit(frx_wrapper, 
-                                   self.E, 
-                                   y_target, 
-                                   p0=p0_free, 
-                                   bounds=bounds,
-                                   method='trf', # Altamente recomendado para bounds
-                                   xtol=tol, 
-                                   ftol=tol
-                                   )
-        elif etapa in ["K", "L"]:    
-            popt, pcov = curve_fit(frx_wrapper, 
-                                  self.E[roi_mask], 
-                                  self.I[roi_mask], 
-                                  p0=p0_free,
-                                  bounds=bounds,
-                                  method='trf',
-                                  x_scale='jac',
-                                  loss='soft_l1',
-                                  xtol=tol, 
-                                  ftol=tol
-                                  )
-        elif etapa == "M":
-            popt, pcov = curve_fit(frx_wrapper, 
-                                  self.E[roi_mask], 
-                                  self.I[roi_mask],
-                                  p0=p0_free,
-                                  bounds=bounds,
-                                  xtol=tol, 
-                                  ftol=tol
-                                  )
-        else: #global
-            sigma_completo = np.sqrt(np.maximum(self.I, 1))
-            sigma_roi = sigma_completo[roi_mask]
-
-            # REFUERZO DE SEMILLA: Antes de entrar, asegurémonos de que 
-            # las áreas no estén en cero si el solver se rindió antes.
-            max_I = np.max(self.I_net)
-            semilla_minima = max_I * 0.005 # 0.5% del pico máximo
-            
-            for i in range(self.offset, len(p0_free)):
-                # Solo reforzamos si el área está muy cerca de cero
-                if p0_free[i] < 0.1: 
-                    # Si es una línea K (el primer slot de cada 3) le damos un empujoncito
-                    if (i - self.offset) % 3 == 0:
-                        p0_free[i] = semilla_minima
-                    # Para L y M (slots 1 y 2), mejor dejarlos en 0 o algo ínfimo
-                    else:
-                        p0_free[i] = 0.01
-                    
-            popt, pcov = curve_fit(frx_wrapper,
-                                  self.E[roi_mask],
-                                  self.I[roi_mask],
-                                  p0=p0_free,
-                                  bounds=bounds,
-                                  sigma=sigma_roi,
-                                  absolute_sigma=True,
-                                  method='trf', 
-                                  x_scale='jac', 
-                                  loss='huber',
-                                  max_nfev=50000,
-                                  xtol=tol*10, 
-                                  ftol=tol*10 
-                              )
-            self.pcov = pcov 
-
-        self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
-        opt_params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
-        if etapa == "bkg":
-            self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
-        else:
-            self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
-            self.I_fit = frx_wrapper(self.E, *popt) 
-
-        if graf:
+        try:
             if etapa == "bkg":
-                mtr.graficar_fondo(self.E, self.I, self.bkg_fit, self.bkg_snip, fondo=self.fondo, grado_fondo=self.grado_fondo)
-            elif etapa == "K":
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                    popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
-                                    umbral_area_familia=0.5,
-                                    umbral_ratio_linea=0.1, config=self.config)
-            elif etapa == "L":
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                    popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
-                                    config=self.config)
+                y_target = np.log(np.maximum(self.bkg_snip, 1e-5)) if self.fondo == "exp_poly" else self.bkg_snip
+                popt, pcov = curve_fit(frx_wrapper, 
+                                       self.E, 
+                                       y_target, 
+                                       p0=p0_free, 
+                                       bounds=bounds,
+                                       method='trf', # Altamente recomendado para bounds
+                                       xtol=tol, 
+                                       ftol=tol
+                                       )
+            elif etapa in ["K", "L"]:    
+                popt, pcov = curve_fit(frx_wrapper, 
+                                      self.E[roi_mask], 
+                                      self.I[roi_mask], 
+                                      p0=p0_free,
+                                      bounds=bounds,
+                                      method='trf',
+                                      x_scale='jac',
+                                      loss='soft_l1',
+                                      xtol=tol, 
+                                      ftol=tol
+                                      )
             elif etapa == "M":
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                    popt, self.p_actual, [etapa],  n_bkg=self.n_bkg,
-                                    umbral_area_familia=0,
-                                    umbral_ratio_linea=0.1, config=self.config)
-            else: # global
-                mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
-                                    popt, self.p_actual, ["K", "L", "M"], n_bkg=self.n_bkg,
-                                    umbral_ratio_linea=0.75, config=self.config)
+                popt, pcov = curve_fit(frx_wrapper, 
+                                      self.E[roi_mask], 
+                                      self.I[roi_mask],
+                                      p0=p0_free,
+                                      bounds=bounds,
+                                      xtol=tol, 
+                                      ftol=tol
+                                      )
+            else: #global
+                sigma_completo = np.sqrt(np.maximum(self.I, 1))
+                sigma_roi = sigma_completo[roi_mask]
+    
+                # REFUERZO DE SEMILLA: Antes de entrar, asegurémonos de que 
+                # las áreas no estén en cero si el solver se rindió antes.
+                max_I = np.max(self.I_net)
+                semilla_minima = max_I * 0.005 # 0.5% del pico máximo
+                
+                for i in range(self.offset, len(p0_free)):
+                    # Solo reforzamos si el área está muy cerca de cero
+                    if p0_free[i] < 0.1: 
+                        # Si es una línea K (el primer slot de cada 3) le damos un empujoncito
+                        if (i - self.offset) % 3 == 0:
+                            p0_free[i] = semilla_minima
+                        # Para L y M (slots 1 y 2), mejor dejarlos en 0 o algo ínfimo
+                        else:
+                            p0_free[i] = 0.01
+                        
+                popt, pcov = curve_fit(frx_wrapper,
+                                      self.E[roi_mask],
+                                      self.I[roi_mask],
+                                      p0=p0_free,
+                                      bounds=bounds,
+                                      sigma=sigma_roi,
+                                      absolute_sigma=True,
+                                      method='trf', 
+                                      x_scale='jac', 
+                                      loss='huber',
+                                      max_nfev=50000,
+                                      xtol=tol*10, 
+                                      ftol=tol*10 
+                                  )
+                self.pcov = pcov 
+    
+            self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
+            opt_params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
+            if etapa == "bkg":
+                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
+            else:
+                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
+                self.I_fit = frx_wrapper(self.E, *popt) 
+    
+            if graf:
+                if etapa == "bkg":
+                    mtr.graficar_fondo(self.E, self.I, self.bkg_fit, self.bkg_snip, fondo=self.fondo, grado_fondo=self.grado_fondo)
+                elif etapa == "K":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
+                                        popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
+                                        umbral_area_familia=0.5,
+                                        umbral_ratio_linea=0.1, config=self.config)
+                elif etapa == "L":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
+                                        popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
+                                        config=self.config)
+                elif etapa == "M":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
+                                        popt, self.p_actual, [etapa],  n_bkg=self.n_bkg,
+                                        umbral_area_familia=0,
+                                        umbral_ratio_linea=0.1, config=self.config)
+                else: # global
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
+                                        popt, self.p_actual, ["K", "L", "M"], n_bkg=self.n_bkg,
+                                        umbral_ratio_linea=0.75, config=self.config)
 
-        #except Exception as e:
-        #    print(f"Error al ajustar {etapa}: {e}")
+        except Exception as e:
+            print(f"Error al ajustar {etapa}: {e}")
 
 #------------------------------------------------------------------------------#
 
@@ -507,6 +507,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
