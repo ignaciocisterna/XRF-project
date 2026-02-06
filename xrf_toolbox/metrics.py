@@ -227,7 +227,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
 
     plt.xlabel('Energía (keV)')
     plt.ylabel('Cuentas')
-    titulo = 'Deconvolución sobre Peaks Dispersivos' if shell == 'scat' else f'Deconvolución sobre Capas {", ".join(shells)} y Dispersión'
+    titulo = 'Deconvolución sobre Peaks Dispersivos' if shells == 'scat' else f'Deconvolución sobre Capas {", ".join(shells)} y Dispersión'
     plt.title(titulo)
     plt.xlim(E.min(), E.max()*1.05)
     plt.ylim(0, max(I) * 2) # Más espacio arriba para etiquetas
