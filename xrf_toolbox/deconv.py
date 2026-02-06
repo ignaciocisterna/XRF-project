@@ -276,7 +276,7 @@ class XRFDeconv:
             is_txrf = getattr(self.config, 'mode', 'EDXRF') == "TXRF"
             if is_txrf:
                  p_base += [0.0, 0.0, 0.0, 0.0] 
-             else:
+            else:
                  p_base += [max_counts * 2, max_counts * 1, max_counts * 0.1, max_counts * 0.05]
                  
             for elem in self.elements:
@@ -394,8 +394,7 @@ class XRFDeconv:
             elif p_idx < self.offset:
                 # Detectamos si es un coeficiente del polinomio de fondo
                 # Asumiendo estructura: [Noise...Offset, c0, c1, c2, Ray, Com...]
-                # Los coeficientes suelen ser los primeros después del índice 5
-                
+                # Los coeficientes suelen ser los primeros después del índice 5        
                 if 6 <= p_idx < limite_bkg:
                     if self.fondo == "exp_poly":
                         lower.append(-100.0); upper.append(100.0)
@@ -646,6 +645,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
