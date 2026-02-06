@@ -108,6 +108,11 @@ def graficar_fondo(E, I, bkg_fit, bkg_snip, figsize=(12, 8), show=True, fondo="p
 def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", "L", "M"], 
                        umbral_area_familia=5, umbral_ratio_linea=0.5, figsize=(12, 8),
                        n_bkg=2,show=True, config=None):    
+    if shells == ["resol"]:
+        resol = True
+        shells = "K"
+    else:
+        resol = False
     
     # 1. Preparar parámetros
     p_to_use = p if p is not None else popt
@@ -121,7 +126,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
     etiquetas_info = []
 
     # --- IDENTIFICACIÓN DE LÍNEAS ATÓMICAS ---
-    if shells in ["K", "L", "M"]:
+    if shells != ["scat"]:
         for elem in elementos:
             if elem not in final_params["elements"]: 
                 continue
@@ -227,7 +232,10 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
 
     plt.xlabel('Energía (keV)')
     plt.ylabel('Cuentas')
-    titulo = 'Deconvolución sobre Peaks Dispersivos' if shells == ['scat'] else f'Deconvolución sobre Capas {", ".join(shells)} y Dispersión'
+    if not resol:
+        titulo = 'Ajuste de Dispersión' if shells == ['scat'] else f'Deconvolución sobre Capas {", ".join(shells)}'
+    else:
+        titulo = 'Calibración Energética y Resolutiva'
     plt.title(titulo)
     plt.xlim(E.min(), E.max()*1.05)
     plt.ylim(0, max(I) * 2) # Más espacio arriba para etiquetas
