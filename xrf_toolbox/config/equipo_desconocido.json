@@ -1,6 +1,7 @@
 {
     "name": "Equipo Desconocido",
     "anode": "Rh",
+    "mode": "EDXRF",
     "geometry": {
         "angle_deg": 90.0,
         "path": {
@@ -22,4 +23,5 @@
         "material": "Be",
         "thickness_um": 100.0
     }
+
 }
