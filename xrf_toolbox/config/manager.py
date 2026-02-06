@@ -6,6 +6,7 @@ class InstrumentConfig:
         # --- Identificación ---
         self.name = data.get("name", "Unknown Instrument")
         self.anode = data.get("anode", "Mo")
+        self.mode = data.get("mode", "EDXRF")
         
         # --- Geometría y Trayecto ---
         geom = data.get("geometry", {})
@@ -54,6 +55,7 @@ class InstrumentConfig:
             "fano": self.fano, 
             "epsilon": self.epsilon
         }
+
 
 
 
