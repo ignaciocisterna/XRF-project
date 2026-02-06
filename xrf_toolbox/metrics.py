@@ -121,39 +121,58 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
     etiquetas_info = []
 
     # --- IDENTIFICACIÓN DE LÍNEAS ATÓMICAS ---
-    for elem in elementos:
-        if elem not in final_params["elements"]: 
-            continue
-        
-        elem_data = final_params["elements"][elem]
-        try:
-            # Reutilizamos la función del paquete para obtener energías
-            info = core.get_Xray_info(elem, families=tuple(shells))
-        except:
-            continue
+    if shells in ["K", "L", "M"]:
+        for elem in elementos:
+            if elem not in final_params["elements"]: 
+                continue
+            
+            elem_data = final_params["elements"][elem]
+            try:
+                # Reutilizamos la función del paquete para obtener energías
+                info = core.get_Xray_info(elem, families=tuple(shells))
+            except:
+                continue
+    
+            for fam in shells:
+                area_fam = elem_data.get(f"area_{fam}", 0)
+                # Solo etiquetamos si el área es significativa
+                if area_fam > umbral_area_familia:
+                    # Buscamos la línea principal de la familia (alfa) para poner la etiqueta
+                    lines_in_fam = {k: v for k, v in info.items() if k.startswith(fam)}
+                    if not lines_in_fam: continue
+                    
+                    # Seleccionamos la línea con mayor ratio para posicionar el texto
+                    main_line = max(lines_in_fam, key=lambda x: lines_in_fam[x]["ratio"])
+                    e0 = lines_in_fam[main_line]["energy"]
+    
+                    if E.min() < e0 < E.max():
+                        # Evitar Mo en zona de dispersión si el ánodo es Mo
+                        if config and config.anode == "Mo" and elem == "Mo" and (17.0 < e0 < 17.6):
+                            continue
+                            
+                        etiquetas_info.append({
+                            'e': e0,
+                            'name': f"{elem}-{fam}\n({area_fam:.1e})", # Agregamos el área aquí
+                            'type': 'elem'
+                        })
 
-        for fam in shells:
-            area_fam = elem_data.get(f"area_{fam}", 0)
-            # Solo etiquetamos si el área es significativa
-            if area_fam > umbral_area_familia:
-                # Buscamos la línea principal de la familia (alfa) para poner la etiqueta
-                lines_in_fam = {k: v for k, v in info.items() if k.startswith(fam)}
-                if not lines_in_fam: continue
+    # --- INDICADORES DE ARTEFACTOS (ESCAPE Y SUMA) ---
+    # Solo graficamos si el pico principal es muy fuerte (> 20% del max global)
+        for elem, data in final_params["elements"].items():
+            area_k = data.get("area_K", 0)
+            if area_k > (np.max(I) * 0.2): 
+                e_ka = xl.LineEnergy(xl.SymbolToAtomicNumber(elem), xl.KA1_LINE)
                 
-                # Seleccionamos la línea con mayor ratio para posicionar el texto
-                main_line = max(lines_in_fam, key=lambda x: lines_in_fam[x]["ratio"])
-                e0 = lines_in_fam[main_line]["energy"]
-
-                if E.min() < e0 < E.max():
-                    # Evitar Mo en zona de dispersión si el ánodo es Mo
-                    if config and config.anode == "Mo" and elem == "Mo" and (17.0 < e0 < 17.6):
-                        continue
-                        
-                    etiquetas_info.append({
-                        'e': e0,
-                        'name': f"{elem}-{fam}\n({area_fam:.1e})", # Agregamos el área aquí
-                        'type': 'elem'
-                    })
+                # Escape (Si Ka - 1.74 keV)
+                e_esc = e_ka - 1.74
+                if E.min() < e_esc < E.max():
+                    etiquetas_info.append({'e': e_esc, 'name': f"esc-{elem}", 'type': 'art'})
+                
+                # Suma (Ka + Ka) - Solo si tau > 0
+                if final_params.get("tau_pileup", 0) > 0:
+                    e_sum = e_ka * 2
+                    if E.min() < e_sum < E.max():
+                        etiquetas_info.append({'e': e_sum, 'name': f"sum-{elem}", 'type': 'art'})
 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
@@ -181,25 +200,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
 
         for s_peak in scat_peaks:
             if E.min() < s_peak['e'] < E.max():
-                etiquetas_info.append({'e': s_peak['e'], 'name': s_peak['name'], 'type': 'scat'})
-
-    # --- INDICADORES DE ARTEFACTOS (ESCAPE Y SUMA) ---
-    # Solo graficamos si el pico principal es muy fuerte (> 20% del max global)
-    for elem, data in final_params["elements"].items():
-        area_k = data.get("area_K", 0)
-        if area_k > (np.max(I) * 0.2): 
-            e_ka = xl.LineEnergy(xl.SymbolToAtomicNumber(elem), xl.KA1_LINE)
-            
-            # Escape (Si Ka - 1.74 keV)
-            e_esc = e_ka - 1.74
-            if E.min() < e_esc < E.max():
-                etiquetas_info.append({'e': e_esc, 'name': f"esc-{elem}", 'type': 'art'})
-            
-            # Suma (Ka + Ka) - Solo si tau > 0
-            if final_params.get("tau_pileup", 0) > 0:
-                e_sum = e_ka * 2
-                if E.min() < e_sum < E.max():
-                    etiquetas_info.append({'e': e_sum, 'name': f"sum-{elem}", 'type': 'art'})
+                etiquetas_info.append({'e': s_peak['e'], 'name': s_peak['name'], 'type': 'scat'}) 
 
     # --- RENDERIZADO DE ETIQUETAS ---
     etiquetas_info.sort(key=lambda x: x['e'])
