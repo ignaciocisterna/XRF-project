@@ -198,7 +198,7 @@ class XRFDeconv:
                 # Fondo y Dispersión
                 if getattr(self.config, 'mode', 'EDXRF') == "TXRF":    # Cambiar luego después de testeo
                      mask_base += [1] * 4    # 4 áreas de dispersión
-                 else:
+                else:
                      mask_base += [1] * 4    # 4 áreas de dispersión
             else: # K, L, M
                 # 1. Parte Base
@@ -646,6 +646,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
