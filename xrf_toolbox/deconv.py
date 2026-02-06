@@ -502,7 +502,7 @@ class XRFDeconv:
             if graf:
                 if etapa == "bkg":
                     mtr.graficar_fondo(self.E, self.I, self.bkg_fit, self.bkg_snip, fondo=self.fondo, grado_fondo=self.grado_fondo)
-                elif etapa == "scat":
+                elif etapa == "scat" or etapa == "resol":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, [etapa], n_bkg=self.n_bkg, config=self.config)   
                 elif etapa == "K":
@@ -646,6 +646,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
