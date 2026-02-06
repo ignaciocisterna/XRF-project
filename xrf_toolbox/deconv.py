@@ -132,6 +132,13 @@ class XRFDeconv:
                 # Fondo y Dispersión
                 mask_base += [1] * self.n_bkg # c0, c1...  
                 mask_base += [0] * 4     # 4 áreas de dispersión
+            elif etapa == "scat":
+                # 1. Parte Base
+                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+                mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
+                # Fondo y Dispersión
+                mask_base += [0] * self.n_bkg # c0, c1...  
+                mask_base += [1] * 4     # 4 áreas de dispersión
             elif etapa == "global": 
                 # 1. Parte Base
                 # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
@@ -214,7 +221,7 @@ class XRFDeconv:
                 idx += 3
 
         else:
-            # Para L, M o global, partimos de lo que ya tenemos ajustado
+            # Para scat, L, M o global, partimos de lo que ya tenemos ajustado
             p_base = self.p_actual.copy()
             
             if etapa == "L":
@@ -311,7 +318,7 @@ class XRFDeconv:
                 lower.append(0.0); upper.append(techo_cuentas)
         
         bounds = (lower, upper)
-        if etapa != "bkg":
+        if etapa != "bkg" and etapa != "scat":
             roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
         try:
@@ -326,27 +333,37 @@ class XRFDeconv:
                                        xtol=tol, 
                                        ftol=tol
                                        )
+            elif etapa == "scat":
+                popt, pcov = curve_fit(frx_wrapper, 
+                                       self.E, 
+                                       self.I,
+                                       p0=p0_free,
+                                       bounds=bounds,
+                                       method='trf',
+                                       xtol=tol, 
+                                       ftol=tol
+                                       )
             elif etapa in ["K", "L"]:    
                 popt, pcov = curve_fit(frx_wrapper, 
-                                      self.E[roi_mask], 
-                                      self.I[roi_mask], 
-                                      p0=p0_free,
-                                      bounds=bounds,
-                                      method='trf',
-                                      x_scale='jac',
-                                      loss='soft_l1',
-                                      xtol=tol, 
-                                      ftol=tol
-                                      )
+                                       self.E[roi_mask], 
+                                       self.I[roi_mask], 
+                                       p0=p0_free,
+                                       bounds=bounds,
+                                       method='trf',
+                                       x_scale='jac',
+                                       loss='soft_l1',
+                                       xtol=tol, 
+                                       ftol=tol
+                                       )
             elif etapa == "M":
                 popt, pcov = curve_fit(frx_wrapper, 
-                                      self.E[roi_mask], 
-                                      self.I[roi_mask],
-                                      p0=p0_free,
-                                      bounds=bounds,
-                                      xtol=tol, 
-                                      ftol=tol
-                                      )
+                                       self.E[roi_mask], 
+                                       self.I[roi_mask],
+                                       p0=p0_free,
+                                       bounds=bounds,
+                                       xtol=tol, 
+                                       ftol=tol
+                                       )
             else: #global
                 sigma_completo = np.sqrt(np.maximum(self.I, 1))
                 sigma_roi = sigma_completo[roi_mask]
@@ -367,19 +384,19 @@ class XRFDeconv:
                             p0_free[i] = 0.01
                         
                 popt, pcov = curve_fit(frx_wrapper,
-                                      self.E[roi_mask],
-                                      self.I[roi_mask],
-                                      p0=p0_free,
-                                      bounds=bounds,
-                                      sigma=sigma_roi,
-                                      absolute_sigma=True,
-                                      method='trf', 
-                                      x_scale='jac', 
-                                      loss='huber',
-                                      max_nfev=50000,
-                                      xtol=tol*10, 
-                                      ftol=tol*10 
-                                  )
+                                       self.E[roi_mask],
+                                       self.I[roi_mask],
+                                       p0=p0_free,
+                                       bounds=bounds,
+                                       sigma=sigma_roi,
+                                       absolute_sigma=True,
+                                       method='trf', 
+                                       x_scale='jac', 
+                                       loss='huber',
+                                       max_nfev=50000,
+                                       xtol=tol*10, 
+                                       ftol=tol*10 
+                                       )
                 self.pcov = pcov 
     
             self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
@@ -393,6 +410,9 @@ class XRFDeconv:
             if graf:
                 if etapa == "bkg":
                     mtr.graficar_fondo(self.E, self.I, self.bkg_fit, self.bkg_snip, fondo=self.fondo, grado_fondo=self.grado_fondo)
+                elif etapa == "scat":
+                    mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
+                                        popt, self.p_actual, [etapa], n_bkg=self.n_bkg, config=self.config)   
                 elif etapa == "K":
                     mtr.graficar_ajuste(self.E, self.I, self.I_fit, self.bkg_fit, self.elements, 
                                         popt, self.p_actual, [etapa], n_bkg=self.n_bkg,
@@ -437,6 +457,16 @@ class XRFDeconv:
         )
         t.start()
         self.run_stage_fit('bkg', graf=graf, roi_margin=roi_margin, tol=tol)
+        stop_event.set()
+        t.join()
+
+        stop_event = threading.Event()
+        t = threading.Thread(
+            target=self.animacion_carga,
+            args=(stop_event, "  > Ajustando Peaks Dispersivos de Rayleigh y Compton")
+        )
+        t.start()
+        self.run_stage_fit('scat', graf=graf, roi_margin=roi_margin, tol=tol)
         stop_event.set()
         t.join()
         
@@ -509,6 +539,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
