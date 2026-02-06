@@ -1,6 +1,7 @@
 {
     "name": "S2 PICOFOX 200",
     "anode": "Mo",
+    "mode": "TXRF",
     "geometry": {
         "angle_deg": 90.0,
         "path": {
@@ -24,6 +25,7 @@
     }
 
 }
+
 
 
 
