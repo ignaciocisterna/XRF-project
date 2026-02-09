@@ -96,7 +96,7 @@ class XRFDeconv:
             else:
                 raise ValueError("Debe ingresarse una lista manual de elementos si la autodetección está desactivada")
         if graf:
-            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip)
+            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip, config=config)
         if verbose:
             print(f"[{self.name}] Reporte de Detección:")
             print("Elemento ---------- Status")
@@ -658,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
