@@ -78,7 +78,7 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
    
     def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
-                           permitir_solapamientos=False, todos=False, autodet=True):
+                           permitir_solapamientos=False, todos=False, autodet=True, config=self.config):
         """Calcula SNIP y detecta elementos."""
         self.bkg_snip = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
                                
@@ -658,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
