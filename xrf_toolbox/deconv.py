@@ -204,9 +204,9 @@ class XRFDeconv:
         elif etapa == "global": 
             # 1. Parte Base
             # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-            mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
+            mask_base = [1, 1, 0, (1 if self.free_tau else 0), 1, 1] # tau dependiente de free_tau
             # Fondo y Dispersión
-            mask_base += [0] * self.n_bkg # c0, c1...
+            mask_base += [1] * self.n_bkg # c0, c1...
             if getattr(self.config, 'mode', 'EDXRF') == "TXRF":    # Cambiar luego después de testeo
                  mask_base += [1] * 4    # 4 áreas de dispersión
             else:
@@ -662,6 +662,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
