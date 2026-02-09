@@ -121,136 +121,133 @@ class XRFDeconv:
             return 0
 #------------------------------------------------------------------------------#
 
-    def identify_major_element(self):
+    def identify_calibration_elements(self):
         """
-        Identifica heurísticamente el elemento con mayor intensidad en el espectro raw
-        para usarlo como ancla de calibración.
+        Identifica el peak de mayor intensidad y devuelve una lista de TODOS los 
+        elementos/líneas que solapan en esa región para un ajuste multielemental.
         """
-        max_counts = -1
-        major_elem = None
-        major_line = "K" # Por defecto
-
+        # 1. Encontrar la energía del máximo global (suavizado ligeramente)
+        # Filtramos energías muy bajas (ruido) o muy altas (fuera de rango útil)
+        valid_mask = (self.E > 1.0) & (self.E < self.config.get("max_energy", 30.0))
+        idx_max = np.argmax(self.I[valid_mask])
+        peak_energy = self.E[valid_mask][idx_max]
+        
+        calibration_set = []
+        threshold_kev = 0.20  # Ventana de solapamiento (aprox 1.5 * FWHM típico)
+    
         for elem in self.elements:
-            # Obtenemos Z
             Z = xl.SymbolToAtomicNumber(elem)
             
-            # Revisamos K alpha primero
-            try:
-                if core.is_excitable(Z, "K", self.config):
-                    line_E = xl.LineEnergy(Z, xl.KA1_LINE)
-                    # Integramos un ROI pequeño de +/- 0.15 keV alrededor
-                    mask = (self.E > line_E - 0.15) & (self.E < line_E + 0.15)
-                    counts = np.sum(self.I[mask])
-                    if counts > max_counts:
-                        max_counts = counts
-                        major_elem = elem
-                        major_line = "K"
-            except: pass
-
-            # Revisamos L alpha si es pesado (ej. Pb, Hg) o si K no existe/es muy alta
-            try:
-                if core.is_excitable(Z, "L", self.config):
-                    line_E = xl.LineEnergy(Z, xl.LA1_LINE)
-                    mask = (self.E > line_E - 0.15) & (self.E < line_E + 0.15)
-                    counts = np.sum(self.I[mask])
-                    # Le damos un peso extra si es L porque suelen tener menos yield, 
-                    # pero aquí nos importa la altura cruda.
-                    if counts > max_counts:
-                        max_counts = counts
-                        major_elem = elem
-                        major_line = "L"
-            except: pass
-            
-        return major_elem, major_line
+            # Revisar Capa K
+            if core.is_excitable(Z, "K", self.config):
+                e_k = xl.LineEnergy(Z, xl.KA1_LINE)
+                if abs(e_k - peak_energy) < threshold_kev:
+                    calibration_set.append((elem, "K"))
+                    continue # Si ya entró por K, no lo evaluamos por L
+    
+            # Revisar Capa L
+            if core.is_excitable(Z, "L", self.config):
+                e_l = xl.LineEnergy(Z, xl.LA1_LINE)
+                if abs(e_l - peak_energy) < threshold_kev:
+                    calibration_set.append((elem, "L"))
+    
+        # Bonus: Siempre incluir el Silicio si está presente para anclar la baja energía
+        if "Si" in self.elements and ("Si", "K") not in calibration_set:
+            calibration_set.append(("Si", "K"))
+    
+        return calibration_set
 
 #------------------------------------------------------------------------------#
 
     def get_mask(self, etapa):
-            """
-            Genera la máscara de parámetros libres.
-            Estructura p: [noise, fano, eps, tau, c0, c1, (c2), RK, CK, RL, CL, Area1_K, Area1_L...]
-            Etapa: "bkg", "scat"/"resol", K", "L", "M" o "global"
-            """
-            n_elem = len(self.elements)
+        """
+        Genera la máscara de parámetros libres.
+        Estructura p: [noise, fano, eps, tau, c0, c1, (c2), RK, CK, RL, CL, Area1_K, Area1_L...]
+        Etapa: "bkg", "scat"/"resol", K", "L", "M" o "global"
+        """
+        n_elem = len(self.elements)
 
-            if etapa == "bkg":
-                # 1. Parte Base
-                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-                mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
-                # Fondo y Dispersión
-                mask_base += [1] * self.n_bkg # c0, c1...  
-                mask_base += [0] * 4     # 4 áreas de dispersión
-            elif etapa == "scat":
-                # EDXRF CALIBRATION MODE
-                # 1. Parte Base
-                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-                mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
-                # Fondo y Dispersión
-                mask_base += [0] * self.n_bkg # c0, c1...  
-                mask_base += [1] * 4     # 4 áreas de dispersión
-            elif etapa == "resol":
-                # TXRF CALIBRATION MODE
-                # 1. Parte Base
-                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-                mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
-                # Fondo y Dispersión
-                mask_base += [0] * self.n_bkg # c0, c1...  
-                mask_base += [0] * 4     # 4 áreas de dispersión
-            elif etapa == "global": 
-                # 1. Parte Base
-                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-                mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
-                # Fondo y Dispersión
-                mask_base += [0] * self.n_bkg # c0, c1...
-                if getattr(self.config, 'mode', 'EDXRF') == "TXRF":    # Cambiar luego después de testeo
-                     mask_base += [1] * 4    # 4 áreas de dispersión
-                else:
-                     mask_base += [1] * 4    # 4 áreas de dispersión
-            else: # K, L, M
-                # 1. Parte Base
-                # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
-                mask_base = [0, 0, 0, (1 if self.free_tau else 0), 0, 0] # tau dependiente de free_tau
-                # Fondo y Dispersión
-                mask_base += [0] * self.n_bkg # c0, c1...  
-                if getattr(self.config, 'mode', 'EDXRF') == "TXRF":
-                     mask_base += [1] * 4    # 4 áreas de dispersión
-                else:
-                     mask_base += [0] * 4    # 4 áreas de dispersión
-                
-            # 2. Parte de Elementos [Area_K, Area_L, Area_M]
-            element_masks = []
-        
-            # Identificamos anclas para modo resol
-            major_elem, major_fam = (None, None)
-            if etapa == "resol":
-                major_elem, major_fam = self.identify_major_element()
+        if etapa == "bkg":
+            # 1. Parte Base
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
+            # Fondo y Dispersión
+            mask_base += [1] * self.n_bkg # c0, c1...  
+            mask_base += [0] * 4     # 4 áreas de dispersión
+        elif etapa == "scat":
+            # EDXRF CALIBRATION MODE
+            # 1. Parte Base
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
+            # Fondo y Dispersión
+            mask_base += [0] * self.n_bkg # c0, c1...  
+            mask_base += [1] * 4     # 4 áreas de dispersión
+        elif etapa == "resol":
+            # TXRF CALIBRATION MODE
+            # 1. Parte Base
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = [1, 1, 1, 0, 1, 1] # tau dependiente de free_tau
+            # Fondo y Dispersión
+            mask_base += [0] * self.n_bkg # c0, c1...  
+            mask_base += [0] * 4     # 4 áreas de dispersión
+        elif etapa == "global": 
+            # 1. Parte Base
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = [0, 0, 0, 0, 0, 0] # tau dependiente de free_tau
+            # Fondo y Dispersión
+            mask_base += [0] * self.n_bkg # c0, c1...
+            if getattr(self.config, 'mode', 'EDXRF') == "TXRF":    # Cambiar luego después de testeo
+                 mask_base += [1] * 4    # 4 áreas de dispersión
+            else:
+                 mask_base += [1] * 4    # 4 áreas de dispersión
+        else: # K, L, M
+            # 1. Parte Base
+            # Por defecto: noise, fano, eps, tau, gain, offset, bkg, scat
+            mask_base = [0, 0, 0, (1 if self.free_tau else 0), 0, 0] # tau dependiente de free_tau
+            # Fondo y Dispersión
+            mask_base += [0] * self.n_bkg # c0, c1...  
+            if getattr(self.config, 'mode', 'EDXRF') == "TXRF":
+                 mask_base += [1] * 4    # 4 áreas de dispersión
+            else:
+                 mask_base += [0] * 4    # 4 áreas de dispersión
             
-            for elem in self.elements:
-                slots = [0, 0, 0] # [K, L, M]
+        # 2. Parte de Elementos [Area_K, Area_L, Area_M]
+        element_masks = []
     
-                if etapa == "resol":
-                    # Solo activamos Si y el Elemento Mayoritario
-                    if elem == "Si":
-                        slots[0] = 1 # Asumimos Si-K siempre
-                    elif elem == major_elem:
-                        if major_fam == "K": slots[0] = 1
-                        elif major_fam == "L": slots[1] = 1
+        # Identificamos anclas para modo resol
+        major_elem, major_fam = (None, None)
+        if etapa == "resol":
+            major_elem, major_fam = self.identify_major_element()
+        
+        for elem in self.elements:
+            slots = [0, 0, 0] # [K, L, M]
+
+            if etapa == "resol":
+                # calibration_list es algo como: [("Si", "K"), ("As", "K"), ("Pb", "L")]
+                for target_elem, family in calibration_list:
+                    if elem == target_elem:
+                        if family == "K": 
+                            slots[0] = 1
+                        elif family == "L": 
+                            slots[1] = 1
+                        elif family == "M": 
+                            slots[2] = 1
+            
+            elif etapa == "K":
+                slots[0] = self.validar_familia(elem, "K")
+            elif etapa == "L":
+                slots[1] = self.validar_familia(elem, "L")
+            elif etapa == "M":
+                slots[2] = self.validar_familia(elem, "M")
+            elif etapa == "global":
+                # En la global, validamos las tres familias rigurosamente
+                slots[0] = self.validar_familia(elem, "K")
+                slots[1] = self.validar_familia(elem, "L")
+                slots[2] = self.validar_familia(elem, "M")
                 
-                elif etapa == "K":
-                    slots[0] = self.validar_familia(elem, "K")
-                elif etapa == "L":
-                    slots[1] = self.validar_familia(elem, "L")
-                elif etapa == "M":
-                    slots[2] = self.validar_familia(elem, "M")
-                elif etapa == "global":
-                    # En la global, validamos las tres familias rigurosamente
-                    slots[0] = self.validar_familia(elem, "K")
-                    slots[1] = self.validar_familia(elem, "L")
-                    slots[2] = self.validar_familia(elem, "M")
-                    
-                element_masks.extend(slots)
-                    
-            return mask_base + element_masks
+            element_masks.extend(slots)
+                
+        return mask_base + element_masks
 
 #------------------------------------------------------------------------------#
     
@@ -289,21 +286,27 @@ class XRFDeconv:
                 p_base += [0, 0, 0]    # K, L, M
 
         elif etapa == "resol":
-             # Copiamos lo actual
-             p_base = self.p_actual.copy()
+            # Copiamos lo actual
+            p_base = self.p_actual.copy()
              
-             # Inyectamos semillas FUERTES para Si y Major Element
-             # para asegurar que el fit no se pierda buscando gain/offset
-             major_elem, major_fam = self.identify_major_element()
-             
-             idx = self.offset
-             for elem in self.elements:
-                 if elem == "Si":
-                     p_base[idx] = np.max(self.I) * 0.5 # Semilla Si-K
-                 elif elem == major_elem:
-                     offset_fam = 0 if major_fam == "K" else 1
-                     p_base[idx + offset_fam] = np.max(self.I) # Semilla al pico más alto
-                 idx += 3
+            # 1. Obtenemos la lista de elementos/familias de calibración
+            calibration_list = self.identify_calibration_elements()
+            num_calib = len(calibration_list)
+            
+            # Calculamos la semilla basada en la intensidad máxima repartida
+            # Si num_calib es 0 (caso raro), usamos 1 para evitar división por cero
+            seed_intensity = np.max(self.I) / max(1, num_calib)
+            
+            idx = self.offset
+            for elem in self.elements:
+                # Revisamos cada familia [K, L, M] para este elemento
+                for f_idx, family in enumerate(["K", "L", "M"]):
+                    # Si esta combinación (elemento, familia) está en nuestra lista VIP, inyectamos semilla
+                    if (elem, family) in calibration_list:
+                        p_base[idx + f_idx] = seed_intensity
+                        
+                # Saltamos al siguiente bloque de parámetros (3 slots por elemento)
+                idx += 3
                  
         elif etapa == "K":
             # Para K partimos de lo que ya tenemos preajustado del fondo
@@ -651,6 +654,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
