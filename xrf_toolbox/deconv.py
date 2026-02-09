@@ -69,7 +69,7 @@ class XRFDeconv:
         if not e_max:
             if self.config.mode == "TXRF":
                 z_anod = xl.SymbolToAtomicNumber(self.config.anode)
-                e_max = xl.LineEnergy(z_anod, "Ka1")
+                e_max = xl.LineEnergy(z_anod, xl.KA1_LINE)
             else:
                 e_max = self.E_raw[-1]
         self.E, self.I = prc.recortar_espectro(self.E_raw, self.I_raw, e_max=e_max)
@@ -135,7 +135,7 @@ class XRFDeconv:
         # 1. Encontrar la energía del máximo global (suavizado ligeramente)
         # Filtramos energías muy bajas (ruido) o muy altas (fuera de rango útil)
         z_anod = xl.SymbolToAtomicNumber(self.config.anode)
-        valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, "Ka1"))
+        valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, xl.KA1_LINE))
         idx_max = np.argmax(self.I[valid_mask])
         peak_energy = self.E[valid_mask][idx_max]
         
@@ -582,7 +582,7 @@ class XRFDeconv:
             stop_event = threading.Event()
             t = threading.Thread(
                 target=self.animacion_carga,
-                args=(stop_event, "  > Calibrando Energía (Si + Mayoritario)")
+                args=(stop_event, "  > Calibrando Energía")
             )
             t.start()
             self.run_stage_fit('resol', graf=graf, roi_margin=roi_margin, tol=tol)
@@ -658,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
