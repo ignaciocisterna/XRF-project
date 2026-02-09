@@ -501,8 +501,8 @@ class XRFDeconv:
                                        x_scale='jac', 
                                        loss='huber',
                                        max_nfev=50000,
-                                       xtol=tol*10, 
-                                       ftol=tol*10 
+                                       xtol=tol*5, 
+                                       ftol=tol*5 
                                        )
                 self.pcov = pcov 
     
@@ -661,6 +661,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
