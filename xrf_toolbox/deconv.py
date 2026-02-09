@@ -135,6 +135,7 @@ class XRFDeconv:
         # 1. Encontrar la energía del máximo global (suavizado ligeramente)
         # Filtramos energías muy bajas (ruido) o muy altas (fuera de rango útil)
         z_anod = xl.SymbolToAtomicNumber(self.config.anode)
+        print("definir máscara válida")
         valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, xl.KA1_LINE))
         idx_max = np.argmax(self.I[valid_mask])
         peak_energy = self.E[valid_mask][idx_max]
@@ -147,6 +148,7 @@ class XRFDeconv:
             
             # Revisar Capa K
             if core.is_excitable(Z, "K", self.config):
+                print(f"revisando capa K de {elem}")
                 e_k = xl.LineEnergy(Z, xl.KA1_LINE)
                 if abs(e_k - peak_energy) < threshold_kev:
                     calibration_set.append((elem, "K"))
@@ -154,6 +156,7 @@ class XRFDeconv:
     
             # Revisar Capa L
             if core.is_excitable(Z, "L", self.config):
+                print(f"revisando capa L de {elem}")
                 e_l = xl.LineEnergy(Z, xl.LA1_LINE)
                 if abs(e_l - peak_energy) < threshold_kev:
                     calibration_set.append((elem, "L"))
@@ -658,6 +661,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
