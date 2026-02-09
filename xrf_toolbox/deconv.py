@@ -148,7 +148,6 @@ class XRFDeconv:
             
             # Revisar Capa K
             if core.is_excitable(Z, "K", self.config):
-                print(f"revisando capa K de {elem}")
                 e_k = xl.LineEnergy(Z, xl.KA1_LINE)
                 if abs(e_k - peak_energy) < threshold_kev:
                     calibration_set.append((elem, "K"))
@@ -156,13 +155,11 @@ class XRFDeconv:
     
             # Revisar Capa L
             if core.is_excitable(Z, "L", self.config):
-                print(f"revisando capa L de {elem}")
                 try:
                     e_l = xl.LineEnergy(Z, xl.LA1_LINE)
                     if abs(e_l - peak_energy) < threshold_kev:
                         calibration_set.append((elem, "L"))
                 except ValueError:
-                    print(f"{elem} no tiene emisión L")
                     pass
     
         # Bonus: Siempre incluir el Silicio si está presente para anclar la baja energía
@@ -665,6 +662,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
