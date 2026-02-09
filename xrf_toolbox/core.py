@@ -325,7 +325,7 @@ def continuum_bkg(E, params, fondo="poly"):
 def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
-    La excitación de Mo y los efectos instrumentales están absorbidos
+    La excitación del ánodo y los efectos instrumentales están absorbidos
     en area_K, area_L y area_M respectivamente.
     """
 
@@ -359,7 +359,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
             if A <= 0:
                 continue
 
-            # Excitación por Mo
+            # Excitación por el ánodo
             if not is_excitable(Z, fam, config):
                 continue
 
@@ -459,6 +459,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
