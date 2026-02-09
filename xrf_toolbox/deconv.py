@@ -78,7 +78,7 @@ class XRFDeconv:
 #------------------------------------------------------------------------------#
    
     def run_identification(self, manual=None, ignore=None, graf=False, verbose=False, 
-                           permitir_solapamientos=False, todos=False, autodet=True, config=self.config):
+                           permitir_solapamientos=False, todos=False, autodet=True):
         """Calcula SNIP y detecta elementos."""
         self.bkg_snip = prc.snip_trace_safe(self.E, self.I, core.fwhm_SNIP)
                                
@@ -96,7 +96,7 @@ class XRFDeconv:
             else:
                 raise ValueError("Debe ingresarse una lista manual de elementos si la autodetección está desactivada")
         if graf:
-            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip, config=config)
+            mtr.graficar_deteccion_preliminar(self.E, self.I, self.elements, self.bkg_snip, config=self.config)
         if verbose:
             print(f"[{self.name}] Reporte de Detección:")
             print("Elemento ---------- Status")
@@ -658,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
