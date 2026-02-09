@@ -6,7 +6,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import datetime
 from . import core
 
-def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
+def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None, config=None):
     """
     Grafica el espectro y etiqueta solo la línea más fuerte (mayor ratio)
     de cada familia (K, L, M) por cada elemento.
@@ -16,8 +16,8 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None):
 
     if bkg_snip is not None:
         plt.plot(E, bkg_snip, label='Fondo SNIP', color='orange', linestyle='--', alpha=0.5)
-
-    plt.axvspan(16.8, E.max(), color='red', alpha=0.08, label='Zona Exclusión Mo')
+    
+    plt.axvspan(16.8, E.max(), color='red', alpha=0.08, label=f'Zona Exclusión {config.anode}')
 
     etiquetas_finales = []
 
