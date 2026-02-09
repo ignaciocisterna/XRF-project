@@ -65,7 +65,13 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
     
-    def prepare_data(self, e_max=17.5):
+    def prepare_data(self, e_max=None):
+        if not e_max:
+            if self.config.mode == "TXRF":
+                z_anod = xl.SymbolToAtomicNumber(self.config.anode)
+                e_max = xl.LineEnergy(z_anod, "Ka1")
+            else:
+                e_max = self.E_raw[-1]
         self.E, self.I = prc.recortar_espectro(self.E_raw, self.I_raw, e_max=e_max)
         print(f"[{self.name}] Datos preparados. Rango: {self.E.min():.2f} - {self.E.max():.2f} keV")
         
@@ -128,7 +134,8 @@ class XRFDeconv:
         """
         # 1. Encontrar la energía del máximo global (suavizado ligeramente)
         # Filtramos energías muy bajas (ruido) o muy altas (fuera de rango útil)
-        valid_mask = (self.E > 1.0) & (self.E < self.config.get("max_energy", 30.0))
+        z_anod = xl.SymbolToAtomicNumber(self.config.anode)
+        valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, "Ka1")
         idx_max = np.argmax(self.I[valid_mask])
         peak_energy = self.E[valid_mask][idx_max]
         
@@ -651,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
