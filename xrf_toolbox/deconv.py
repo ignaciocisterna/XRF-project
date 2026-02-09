@@ -135,7 +135,7 @@ class XRFDeconv:
         # 1. Encontrar la energía del máximo global (suavizado ligeramente)
         # Filtramos energías muy bajas (ruido) o muy altas (fuera de rango útil)
         z_anod = xl.SymbolToAtomicNumber(self.config.anode)
-        valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, "Ka1")
+        valid_mask = (self.E > 1.0) & (self.E < xl.LineEnergy(z_anod, "Ka1"))
         idx_max = np.argmax(self.I[valid_mask])
         peak_energy = self.E[valid_mask][idx_max]
         
@@ -658,6 +658,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
