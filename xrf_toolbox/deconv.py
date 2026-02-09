@@ -213,16 +213,13 @@ class XRFDeconv:
             
         # 2. Parte de Elementos [Area_K, Area_L, Area_M]
         element_masks = []
-    
-        # Identificamos anclas para modo resol
-        major_elem, major_fam = (None, None)
-        if etapa == "resol":
-            major_elem, major_fam = self.identify_major_element()
-        
+            
         for elem in self.elements:
             slots = [0, 0, 0] # [K, L, M]
 
             if etapa == "resol":
+                # Identificamos anclas para modo resol
+                calibration_list = self.identify_calibration_elements()
                 # calibration_list es algo como: [("Si", "K"), ("As", "K"), ("Pb", "L")]
                 for target_elem, family in calibration_list:
                     if elem == target_elem:
@@ -654,6 +651,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
