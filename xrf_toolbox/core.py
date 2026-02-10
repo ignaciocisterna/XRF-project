@@ -1,6 +1,7 @@
 import numpy as np
 import xraylib as xl
 from scipy.special import voigt_profile
+from numpy.polynomial.chebyshev import chebval
 
 # Información de emisiones y probabilidades radiativas
 def get_Xray_info(symb, families=("K", "L", "M")):
@@ -312,13 +313,16 @@ def continuum_bkg(E, params, fondo="poly"):
     """ Función del fondo ajustable """
     bkg_coeffs = params["background"] # Ya viene con el largo correcto
     
-    # Calculamos el polinomio base (funciona para cualquier grado)
-    poly = np.polyval(bkg_coeffs[::-1], E)
-    
     if fondo == "poly":
-        return poly
+        # Calculamos el polinomio base (funciona para cualquier grado)
+        return np.polyval(bkg_coeffs[::-1], E)
+        
     elif fondo == "exp_poly":
-        return np.exp(np.clip(poly, -700, 700))
+        E_min = E.min()
+        E_max = E.max()
+        E_norm = 2 * (E - E-min) / (E_max - E_min) - 1
+        poly = chebval(E_norm, bkg_coeffs)
+        return np.exp(np.clip(poly, -700, 700)
 
 
 # Modelo Espectro
@@ -459,6 +463,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
