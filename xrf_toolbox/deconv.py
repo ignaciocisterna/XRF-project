@@ -285,7 +285,8 @@ class XRFDeconv:
                 self.noise_init, self.fano_init, self.epsilon_init,
                 self.tau_init,
                 1.0, 0.0,           # gain, offset
-                ] + semillas_bkg    # c0, c1, ... , cN
+                ]  
+            p_base += semillas_bkg    # c0, c1, ... , cN
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             is_txrf = getattr(self.config, 'mode', 'EDXRF') == "TXRF"
@@ -666,6 +667,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
