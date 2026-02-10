@@ -312,12 +312,14 @@ def is_excitable(Z, family, config):
 def continuum_bkg(E, params, fondo="poly", E_min=None, E_max=None):
     """ Función del fondo ajustable """
     bkg_coeffs = params["background"] # Ya viene con el largo correcto
+    print("entrando a función de fondo")
     
     if fondo == "poly":
         # Calculamos el polinomio base (funciona para cualquier grado)
         return np.polyval(bkg_coeffs[::-1], E)
         
     elif fondo == "exp_poly":
+        print("normalizando dominio energético")
         E_norm = 2 * (E - E_min) / (E_max - E_min) - 1
         poly = chebval(E_norm, bkg_coeffs)
         return np.exp(np.clip(poly, -700, 700))
@@ -476,6 +478,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
