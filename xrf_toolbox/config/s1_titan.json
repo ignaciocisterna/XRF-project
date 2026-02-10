@@ -3,7 +3,7 @@
     "anode": "Rh",
     "mode": "EDXRF",
     "geometry": {
-        "angle_deg": 141.0, 
+        "angle_deg": 135.0, 
         "path": {
           "atmosphere": "air",
           "distance_mm": 10.0
@@ -24,5 +24,6 @@
         "thickness_um": 1.0 
     }
 }
+
 
 
