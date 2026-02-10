@@ -12,16 +12,17 @@
     "detector": {
         "material": "Si",
         "thickness_mm": 0.45,
-        "active_area_mm2": 20.0, // Confirmado por la tabla: 20mm2
+        "active_area_mm2": 20.0, 
         "fano_default": 0.114,
         "noise_default_kev": 0.065,
         "epsilon_kev": 0.00365,
-        "resolution_mn_ka_ev": 145.0, // Confirmado: <145eV
-        "dead_layer_um": 0.02 // El grafeno permite capas muertas más delgadas
+        "resolution_mn_ka_ev": 145.0, 
+        "dead_layer_um": 0.02 
     },
     "window": {
-        "material": "C", // Grafeno está compuesto de Carbono
-        "thickness_um": 1.0 // Las ventanas de grafeno son extremadamente delgadas
+        "material": "C", 
+        "thickness_um": 1.0 
     }
 }
+
 
