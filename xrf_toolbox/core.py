@@ -309,7 +309,7 @@ def is_excitable(Z, family, config):
         return False
 
 # Modelo Fondo continuo
-def continuum_bkg(E, params, fondo="poly"):
+def continuum_bkg(E, params, fondo="poly", E_min=None, E_max=None):
     """ Función del fondo ajustable """
     bkg_coeffs = params["background"] # Ya viene con el largo correcto
     
@@ -318,8 +318,6 @@ def continuum_bkg(E, params, fondo="poly"):
         return np.polyval(bkg_coeffs[::-1], E)
         
     elif fondo == "exp_poly":
-        E_min = E.min()
-        E_max = E.max()
         E_norm = 2 * (E - E_min) / (E_max - E_min) - 1
         poly = chebval(E_norm, bkg_coeffs)
         return np.exp(np.clip(poly, -700, 700))
@@ -368,7 +366,7 @@ def add_anode_scattering(spectrum, E, params, config):
     return spectrum
 
 # Modelo Espectro
-def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
+def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E_min=None, E_max=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación del ánodo y los efectos instrumentales están absorbidos
@@ -425,7 +423,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
     spectrum = add_anode_scattering(spectrum, E, params, config)
   
    # --- FONDO CONTINUO ---
-    background = continuum_bkg(E, params, fondo=fondo)
+    background = continuum_bkg(E, params, fondo=fondo,  E_min=E_min, E_max=E_max)
     
     # spectrum es la suma de picos calculada previamente
     return spectrum + background
@@ -478,6 +476,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
