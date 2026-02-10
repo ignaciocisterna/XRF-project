@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import time
 import itertools
 import threading
-
+from numpy.polynomial.chebyshev import Chebyshev
 # Importaciones relativas 
 from . import core as core
 from . import processing as prc
@@ -263,24 +263,29 @@ class XRFDeconv:
         if etapa == "bkg":
             if self.fondo == "exp_poly":
                 # Trabajamos en escala Logarítmica para las semillas
-                # Sumamos 1e-5 para evitar log(0) si hay ceros
+                # 1. Filtramos datos para el fit inicial (evitar log(0) y picos muy altos)
                 log_bkg = np.log(np.maximum(self.bkg_snip, 1e-5))
-                
-                c0_init = np.mean(log_bkg) # Promedio del log es más seguro
-                c1_init = 0 # Empezamos plano para dejar que el fit encuentre la pendiente
+                # 2. Ajuste lineal de Chebyshev (instantáneo y globalmente óptimo)
+                # Esto es lo que recomienda Van Espen: linealizar el problema exponencial
+                E_min, E_max = self.E.min(), self.E.max()
+                E_norm = 2 * (self.E - E_min) / (E_max - E_min) - 1
+
+                fit_cheb = Chebyshev.fit(E_norm, log_bkg, deg=self.grado_fondo)
+                semillas_bkg = fit_cheb.coef
+
             else:
                 c0_init = np.min(self.bkg_snip)
                 c1_init = (self.bkg_snip[-1] - self.bkg_snip[0]) / (self.E[-1] - self.E[0])
+                semillas_bkg = [c0_init, c1_init]
+                semillas_bkg += [0.0] * (self.n_bkg - 2)
 
             # Semillas de dispersión basadas en el máximo del espectro
             max_counts = np.max(self.I)
             p_base = [
                 self.noise_init, self.fano_init, self.epsilon_init,
                 self.tau_init,
-                1.0, 0.0,    # gain, offset
-                c0_init, c1_init
-            ]
-            if self.grado_fondo != 1: p_base += [0.0] * (self.n_bkg - 2)
+                1.0, 0.0,           # gain, offset
+                ] + semillas_bkg    # c0, c1, ... , cN
             
             # [Ray_K, Com_K, Ray_L, Com_L]
             is_txrf = getattr(self.config, 'mode', 'EDXRF') == "TXRF"
@@ -661,6 +666,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
