@@ -522,7 +522,7 @@ class XRFDeconv:
             if etapa == "bkg":
                 self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo, E_min=E_min, E_max=E_max)
             else:
-                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
+                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo,  E_min=E_min, E_max=E_max)
                 self.I_fit = frx_wrapper(self.E, *popt) 
     
             if graf:
@@ -672,6 +672,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
