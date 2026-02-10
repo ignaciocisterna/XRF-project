@@ -324,6 +324,48 @@ def continuum_bkg(E, params, fondo="poly"):
         poly = chebval(E_norm, bkg_coeffs)
         return np.exp(np.clip(poly, -700, 700))
 
+# Modelo Dispersión
+def add_anode_scattering(spectrum, E, params, config):
+    """
+    Agrega los picos de dispersión (Rayleigh y Compton) del ánodo.
+    Detecta automáticamente las familias K y L del material del ánodo.
+    """
+    # 1. Parámetros instrumentales globales
+    noise, fano, epsilon = params["noise"], params["fano"], params["epsilon"]
+    # 2. Obtenemos información física del ánodo
+    tube_info = get_Xray_info(config.anode, families=("K", "L"))
+    # 3. Extraemos parámetros de amplitud (Ajustados por el fit)
+    # Ahora esperamos: scat_ray_K, scat_com_K, scat_ray_L, scat_com_L
+    scat_areas = params.get("scat_areas", {}) 
+    
+    for line_name, data in tube_info.items():
+        E_tube = data["energy"]
+        ratio = data["ratio"]
+        gamma_tube = data["gamma"]
+        fam = line_family(line_name) # "K" o "L"
+    
+        # Obtenemos el área base para esta familia (si no existe, 0)
+        a_ray = scat_areas.get(f"ray_{fam}", 0.0)
+        a_com = scat_areas.get(f"com_{fam}", 0.0)
+        
+        # --- RAYLEIGH (Elástico) ---
+        if a_ray > 0:
+            s_ray = sigma_E(E_tube, noise, fano, epsilon)
+            peak_R = voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube) 
+            spectrum += peak_R * get_efficiency(E_tube, config)
+            
+        # --- COMPTON (Inelástico) ---
+        if a_com > 0:
+            # Calcular cambio de energía según ángulo
+            E_com = get_compton_energy(E_tube, config.angle)
+            # Verificar si el pico cae dentro del rango del espectro
+            if E.min() < E_com < E.max():
+                s_com = sigma_E(E_com, noise, fano, epsilon)
+                # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
+                peak_C = compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle)
+                spectrum += peak_C * get_efficiency(E_com, config)
+                
+    return spectrum
 
 # Modelo Espectro
 def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
@@ -380,36 +422,9 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None):
             spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, live_time, config)
 
     # --- PICOS DE DISPERSIÓN ---
-    # Rayleigh: Elástico ; Compton: Inelástico (depende del ángulo del detector)
-    
-    # Obtenemos info completa del ánodo (K y L)
-    tube_info = get_Xray_info(config.anode, families=("K", "L"))
-    
-    # Extraemos las áreas de dispersión del diccionario params
-    # Ahora esperamos: scat_ray_K, scat_com_K, scat_ray_L, scat_com_L
-    scat_areas = params.get("scat_areas", {}) 
-    
-    for line_name, data in tube_info.items():
-        E_tube = data["energy"]
-        ratio = data["ratio"]
-        gamma_tube = data["gamma"]
-        fam = line_family(line_name) # "K" o "L"
-    
-        # Obtenemos el área base para esta familia (si no existe, 0)
-        a_ray = scat_areas.get(f"ray_{fam}", 0.0)
-        a_com = scat_areas.get(f"com_{fam}", 0.0)
-    
-        if a_ray > 0:
-            s_ray = sigma_E(E_tube, noise, fano, epsilon)
-            spectrum += voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube) * get_efficiency(E_tube, config)
-    
-        if a_com > 0:
-            E_com = get_compton_energy(E_tube, config.angle)
-            s_com = sigma_E(E_com, noise, fano, epsilon)
-            # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
-            spectrum += compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle) * get_efficiency(E_com, config)
-
-   # --- FONDO DINÁMICO ---
+    spectrum = add_anode_scattering(spectrum, E, params, config)
+  
+   # --- FONDO CONTINUO ---
     background = continuum_bkg(E, params, fondo=fondo)
     
     # spectrum es la suma de picos calculada previamente
@@ -463,6 +478,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
