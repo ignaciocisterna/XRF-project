@@ -374,7 +374,6 @@ class XRFDeconv:
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 bkg_params = params["background"]
                 if self.fondo == "exp_poly":
-                    print("entrada wrapper")
                     # 1. Normalización idéntica a la del core (CRÍTICO)
                     # Usamos los límites de la etapa de bkg para que el dominio [-1, 1] sea consistente
                     E_norm = 2 * (E_val - E_min) / (E_max - E_min) - 1
@@ -521,7 +520,7 @@ class XRFDeconv:
             self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
             opt_params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
             if etapa == "bkg":
-                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
+                self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo, E_min=E_min, E_max=E_max)
             else:
                 self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo)
                 self.I_fit = frx_wrapper(self.E, *popt) 
@@ -673,6 +672,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
