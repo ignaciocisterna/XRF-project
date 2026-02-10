@@ -320,9 +320,9 @@ def continuum_bkg(E, params, fondo="poly"):
     elif fondo == "exp_poly":
         E_min = E.min()
         E_max = E.max()
-        E_norm = 2 * (E - E-min) / (E_max - E_min) - 1
+        E_norm = 2 * (E - E_min) / (E_max - E_min) - 1
         poly = chebval(E_norm, bkg_coeffs)
-        return np.exp(np.clip(poly, -700, 700)
+        return np.exp(np.clip(poly, -700, 700))
 
 
 # Modelo Espectro
@@ -463,6 +463,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
