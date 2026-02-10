@@ -373,17 +373,21 @@ class XRFDeconv:
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 bkg_params = params["background"]
                 if self.fondo == "exp_poly":
-                    # Directamente el polinomio (sin exp ni log, por eficiencia)
-                    return np.polyval(bkg_params[::-1], E_val)
+                    # 1. Normalización idéntica a la del core (CRÍTICO)
+                    # Usamos los límites de la etapa de bkg para que el dominio [-1, 1] sea consistente
+                    E_min, E_max = E_val.min(), E_val.max()
+                    E_norm = 2 * (E_val - E_min) / (E_max - E_min) - 1
+                    # 2. Evaluación con Chebyshev (sin exp, porque ajustamos contra log(SNIP))
+                    # Importante: bkg_params ya viene en orden [c0, c1...] desde pack_params
+                    return core.chebval(E_norm, bkg_params)
+                    
                 elif self.fondo == "poly":
                     return core.continuum_bkg(E_val, params, fondo=self.fondo)
         else:
             def frx_wrapper(E_val, *p_free):
                 p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
-                return core.FRX_model_sdd_general(E_val, params, self.t_live, fondo=self.fondo, config=self.config)
-        
-        
+                return core.FRX_model_sdd_general(E_val, params, self.t_live, fondo=self.fondo, config=self.config) 
 
         # BOUNDS DINÁMICOS
         # Identificamos los índices de los parámetros que SÍ son libres
@@ -667,6 +671,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
