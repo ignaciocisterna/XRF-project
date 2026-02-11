@@ -5,7 +5,19 @@ from numpy.polynomial.chebyshev import chebval
 
 # Información de emisiones y probabilidades radiativas
 def get_Xray_info(symb, families=("K", "L", "M")):
+    """
+    Obtiene líneas de emisión usando Secciones Eficaces de Producción
+    para corregir las proporciones entre subcapas.
+    
+    E_ref: Energía de excitación de referencia (keV). 
+           Idealmente la energía Ka del ánodo (ej. 20.21 para Rh).
+    """
     Z = xl.SymbolToAtomicNumber(symb)
+    # Si no nos dan energía de referencia, usamos una alta por defecto (50 keV)
+    # para asegurar que calculamos ratios válidos incluso si el ánodo es ligero.
+    if E_ref is None:
+        E_ref = 50.0
+        
     K_LINES = {
         "Ka1": xl.KA1_LINE,
         "Ka2": xl.KA2_LINE,
@@ -61,34 +73,49 @@ def get_Xray_info(symb, families=("K", "L", "M")):
     for fam in families:
         lines, ref_name = families_def[fam]
 
-        # línea de referencia (Ka1, La1, Ma1)
+        # 1. Obtener CS de la línea de referencia (Denominador)
+        # Usamos CS_FluorLine_Kissel que es más preciso
         try:
-            ref_rate = xl.RadRate(Z, lines[ref_name])
+            # Verificamos si la línea existe para ese Z
+            ref_line_id = lines[ref_name]
+            # Calculamos la sección eficaz de producción a la energía de referencia
+            ref_cs = xl.CS_FluorLine_Kissel(Z, ref_line_id, E_ref)
         except ValueError:
             continue
 
-        if ref_rate <= 0:
-            continue
+        if ref_cs <= 0:
+            # Si la energía de referencia no excita la línea, intentamos
+            # con una energía de respaldo muy alta (ej. 100 keV) solo para obtener
+            # los ratios relativos de la familia, asumiendo que el usuario
+            # filtrará la excitación real después con is_excitable.
+            try:
+                ref_cs = xl.CS_FluorLine_Kissel(Z, ref_line_id, 100.0)
+            except ValueError:
+                continue
+            if ref_cs <= 0: continue
 
         for name, line_id in lines.items():
             try:
                 energy = xl.LineEnergy(Z, line_id)
-                rate = xl.RadRate(Z, line_id)
+                
+                # 2. Calcular CS de la línea actual (Numerador)
+                # Usamos la misma energía E_ref para ser consistentes
+                cs = xl.CS_FluorLine_Kissel(Z, line_id, E_ref)
+                
+                # Fallback si E_ref era muy baja (mismo truco de arriba)
+                if cs <= 0:
+                    cs = xl.CS_FluorLine_Kissel(Z, line_id, 100.0)
 
-                if energy > 0 and rate > 0:
-                    # --- CÁLCULO DE GAMMA (Lorentziano) ---
-                    # El ancho de la línea es la suma de los anchos de los niveles involucrados
+                if energy > 0 and cs > 0:
+                    # --- CÁLCULO DE GAMMA ---
                     lvl_init, lvl_final = LINE_LEVELS[name]
                     gamma_total_keV = (xl.AtomicLevelWidth(Z, lvl_init) + 
                                        xl.AtomicLevelWidth(Z, lvl_final))
-                    
-                    # Para voigt_profile(sigma, gamma), gamma suele ser el HWHM 
-                    # xraylib devuelve el ancho total (FWHM), por eso dividimos por 2
                     gamma_hwhm = gamma_total_keV / 2.0
                     
                     info[name] = {
                         "energy": energy,
-                        "ratio": rate / ref_rate,
+                        "ratio": cs / ref_cs, # AHORA SÍ: Ratio físico real
                         "gamma": gamma_hwhm
                     }
 
@@ -476,6 +503,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
