@@ -246,7 +246,7 @@ def voigt_peak(E, area, E0, sigma, gamma):
     """
     return area * voigt_profile(E - E0, sigma, gamma)
 
-def get_doppler_width(E_inc, angle_deg, cte_mom_elec=0.295):
+def get_doppler_width(E_inc, angle_deg):
     """
     Calcula una sigma de Doppler aproximada.
     Para TXRF con muestras ligeras, el ensanchamiento es ~0.3% de la E_inc.
@@ -254,12 +254,12 @@ def get_doppler_width(E_inc, angle_deg, cte_mom_elec=0.295):
     m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
     angle_rad = np.radians(angle_deg)
     # Constante de momento electrónico típico de la matriz (ajustar)
-    #cte_mom_elec = 0.295
+    cte_mom_elec = 0.362
     factor_geometrico = np.sin(angle_rad / 2)
     return (E_inc**2 / m_e_c2) * factor_geometrico *  cte_mom_elec
 
 # Perfil de los peaks de dispersión de Compton
-def compton_peak(E, area, E_com, E_inc, sigma_inst, angle_deg, cte_mom_elec=0.295):
+def compton_peak(E, area, E_com, E_inc, sigma_inst, angle_deg):
     """
     E: Vector de energías.
     E_com: Centro del pico Compton.
@@ -267,7 +267,7 @@ def compton_peak(E, area, E_com, E_inc, sigma_inst, angle_deg, cte_mom_elec=0.29
     sigma_inst: Resolución instrumental (sigma_E).
     """
     # Calcular el ensanchamiento de Doppler
-    doppler_width = get_doppler_width(E_inc, angle_deg, cte_mom_elec)
+    doppler_width = get_doppler_width(E_inc, angle_deg)
     
     # La sigma total es la suma cuadrática de la resolución y el Doppler
     sigma_total = np.sqrt(sigma_inst**2 + doppler_width**2)
@@ -323,7 +323,7 @@ def continuum_bkg(E, params, fondo="poly", E_min=None, E_max=None):
         return np.exp(np.clip(poly, -700, 700))
 
 # Modelo Dispersión
-def add_anode_scattering(spectrum, E, params, config, cte_mom_elec=0.295):
+def add_anode_scattering(spectrum, E, params, config):
     """
     Agrega los picos de dispersión (Rayleigh y Compton) del ánodo.
     Detecta automáticamente las familias K y L del material del ánodo.
@@ -360,13 +360,13 @@ def add_anode_scattering(spectrum, E, params, config, cte_mom_elec=0.295):
             if E.min() < E_com < E.max():
                 s_com = sigma_E(E_com, noise, fano, epsilon)
                 # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
-                peak_C = compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle, cte_mom_elec)
+                peak_C = compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle)
                 spectrum += peak_C * get_efficiency(E_com, config)
                 
     return spectrum
 
 # Modelo Espectro
-def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E_min=None, E_max=None, cte_mom_elec=0.295):
+def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E_min=None, E_max=None):
     """
     Modelo FRX generalizado con áreas independientes por familia K, L y M.
     La excitación del ánodo y los efectos instrumentales están absorbidos
@@ -420,7 +420,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E
             spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, live_time, config)
 
     # --- PICOS DE DISPERSIÓN ---
-    spectrum = add_anode_scattering(spectrum, E, params, config, cte_mom_elec)
+    spectrum = add_anode_scattering(spectrum, E, params, config)
   
    # --- FONDO CONTINUO ---
     background = continuum_bkg(E, params, fondo=fondo,  E_min=E_min, E_max=E_max)
@@ -476,6 +476,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
