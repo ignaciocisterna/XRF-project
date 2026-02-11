@@ -399,8 +399,8 @@ class XRFDeconv:
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
         techo_cuentas = np.max(self.I) * 1.5
-        
-        for i, val in enumerate(p0_free[:-2]):
+        if etapa != "bkg": p0_free = p0_free[:-2]    # temppral
+        for i, val in enumerate(p0_free):
             # Encontrar a qué parámetro real corresponde este p0_free[i]
             # Esto es clave para aplicar límites físicos
             p_idx = indices_libres[i]
@@ -676,6 +676,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
