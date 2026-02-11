@@ -366,7 +366,7 @@ class XRFDeconv:
             self.p_actual = self.get_p0("bkg")
 
         p0_free = self.get_p0(etapa, free_mask)
-        if etapa != "bkg": p0_free.extend([0.295]) # temporal
+        if etapa != "bkg": p0_free.append(0.295) # temporal
         E_min, E_max = self.E.min(), self.E.max()
 
         if etapa == "bkg":
@@ -676,6 +676,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
