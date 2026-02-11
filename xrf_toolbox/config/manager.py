@@ -30,6 +30,9 @@ class InstrumentConfig:
         self.fano = det.get("fano_default", 0.115)
         self.epsilon = det.get("epsilon_kev", 0.00365)
         self.res_mn_ka = det.get("resolution_mn_ka_ev", 149.0)
+
+        # --- Irradiador de Rayos X ---
+        self.voltaje = data.get("voltaje_kV", 50.0)
         
         # --- Ventana ---
         win = data.get("window", {})
@@ -55,6 +58,7 @@ class InstrumentConfig:
             "fano": self.fano, 
             "epsilon": self.epsilon
         }
+
 
 
 
