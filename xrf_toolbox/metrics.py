@@ -24,7 +24,7 @@ def graficar_deteccion_preliminar(E, I, elementos_detectados, bkg_snip=None, con
     for symb in elementos_detectados:
         try:
             # Obtenemos todas las líneas disponibles
-            info_lineas = core.get_Xray_info(symb, families=("K", "L", "M"))
+            info_lineas = core.get_Xray_info(symb, families=("K", "L", "M"), config=config)
 
             # Diccionario temporal para encontrar la mejor línea por familia
             # Estructura: {'K': {'e': energy, 'ratio': max_ratio, 'name': 'Ka1'}, ...}
@@ -134,7 +134,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
             elem_data = final_params["elements"][elem]
             try:
                 # Reutilizamos la función del paquete para obtener energías
-                info = core.get_Xray_info(elem, families=tuple(shells))
+                info = core.get_Xray_info(elem, families=tuple(shells), config=config)
             except:
                 continue
     
@@ -182,7 +182,7 @@ def graficar_ajuste(E, I, I_fit, bkg_fit, elementos, popt, p=None, shells=["K", 
     # --- IDENTIFICACIÓN DE DISPERSIÓN ---
     if config:
         scat = final_params.get("scat_areas", {})
-        tube_info = core.get_Xray_info(config.anode, families=("K", "L"))
+        tube_info = core.get_Xray_info(config.anode, families=("K", "L"), config=config)
         # Nos enfocamos en las líneas más intensas del tubo para dispersión
         scat_peaks = []
         
@@ -491,7 +491,7 @@ def generar_reporte_completo(E, I, I_fit, bkg_fit, popt, elementos, nombre_muest
             axes[i].fill_between(E[mask], diff, color='blue', alpha=0.15, label='Residuo')
             
             # Emisión característica
-            info = core.get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'], config=config)
             for line_name, line_data in info.items():
                 y_text = I[mask].max() * line_data['ratio']
                 if line_data['energy'] > res['range'][0] and line_data['energy'] < res['range'][1]:
@@ -535,7 +535,7 @@ def generar_reporte_completo(E, I, I_fit, bkg_fit, popt, elementos, nombre_muest
             axes[i].grid(True, alpha=0.2)
             
             # Emisión característica
-            info = core.get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'], config=config)
             for line_name, line_data in info.items():
                 y_text = I[mask].max() * line_data['ratio']
                 if line_data['energy'] > res['range'][0] and line_data['energy'] < res['range'][1]:
@@ -614,7 +614,7 @@ def exportar_reporte_pdf(E, I, I_fit, bkg_fit, popt, elementos, config, nombre_m
             axes[i].plot(E[m], I_fit[m], 'r-', lw=1.2)
             axes[i].fill_between(E[m], I[m]-I_fit[m], color='blue', alpha=0.1)
             # Emisión característica
-            info = core.get_Xray_info(res['elemento'])
+            info = core.get_Xray_info(res['elemento'], config=config)
             for line_name, line_data in info.items():
                 ymin, ymax = axes[i].get_ylim()
                 npoint = 0.9 * (ymin + ymax)  
