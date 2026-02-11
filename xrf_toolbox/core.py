@@ -16,10 +16,9 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     # Si no nos dan energía de referencia, usamos una alta por defecto (50 keV)
     # para asegurar que calculamos ratios válidos incluso si el ánodo es ligero.
     if config:
-        if E_ref:
-            print("Energía de emisión del ánodo priorizada como referencia")
-        Z_anode = xl.SymbolToAtomicNumber(config.anode)
-        E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
+        if not E_ref:
+            Z_anode = xl.SymbolToAtomicNumber(config.anode)
+            E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
     else:
         if E_ref is None:
             E_ref = 50.0
@@ -364,7 +363,7 @@ def add_anode_scattering(spectrum, E, params, config):
     # 1. Parámetros instrumentales globales
     noise, fano, epsilon = params["noise"], params["fano"], params["epsilon"]
     # 2. Obtenemos información física del ánodo
-    tube_info = get_Xray_info(config.anode, families=("K", "L"), config=config)
+    tube_info = get_Xray_info(config.anode, families=("K", "L"), E_ref=config.voltaje)
     # 3. Extraemos parámetros de amplitud (Ajustados por el fit)
     # Ahora esperamos: scat_ray_K, scat_com_K, scat_ray_L, scat_com_L
     scat_areas = params.get("scat_areas", {}) 
@@ -509,6 +508,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
