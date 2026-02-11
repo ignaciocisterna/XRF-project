@@ -455,6 +455,7 @@ class XRFDeconv:
                                        ftol=tol
                                        )
             elif etapa == "scat" or etapa == "resol":
+                p0_free.append(0.295) # temporal
                 popt, pcov = curve_fit(frx_wrapper, 
                                        self.E, 
                                        self.I,
@@ -676,6 +677,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
