@@ -254,7 +254,7 @@ class XRFDeconv:
                 
             element_masks.extend(slots)
                 
-        return mask_base + element_masks
+        return mask_base + element_masks 
 
 #------------------------------------------------------------------------------#
     
@@ -366,6 +366,7 @@ class XRFDeconv:
             self.p_actual = self.get_p0("bkg")
 
         p0_free = self.get_p0(etapa, free_mask)
+        if etapa != "bkg": p0_free.extend(0.295) # temporal
         E_min, E_max = self.E.min(), self.E.max()
 
         if etapa == "bkg":
@@ -385,10 +386,10 @@ class XRFDeconv:
                     return core.continuum_bkg(E_val, params, fondo=self.fondo)
         else:
             def frx_wrapper(E_val, *p_free):
-                p_full = core.build_p_from_free(p_free, self.p_actual, free_mask)
+                p_full = core.build_p_from_free(p_free[:-2], self.p_actual, free_mask)
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 return core.FRX_model_sdd_general(E_val, params, self.t_live, fondo=self.fondo, 
-                                                  config=self.config, E_min=E_min, E_max=E_max) 
+                                                  config=self.config, E_min=E_min, E_max=E_max, cte_mom_elec=p_free[-1]) 
 
         # BOUNDS DINÁMICOS
         # Identificamos los índices de los parámetros que SÍ son libres
@@ -434,7 +435,9 @@ class XRFDeconv:
             # --- Áreas de Elementos ---
             else: # Áreas de elementos
                 lower.append(0.0); upper.append(techo_cuentas)
-        
+        if etapa != "bkg":        # temporal
+            lower.append(0.1)
+            upper.append(0.5)
         bounds = (lower, upper)
         if etapa not in ["bkg", "scat", "resol"]:
             roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
@@ -672,6 +675,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
