@@ -254,7 +254,7 @@ def get_doppler_width(E_inc, angle_deg):
     m_e_c2 = 510.99895  # Energía en reposo del electrón en keV
     angle_rad = np.radians(angle_deg)
     # Constante de momento electrónico típico de la matriz (ajustar)
-    cte_mom_elec = 0.45
+    cte_mom_elec = 0.25
     factor_geometrico = np.sin(angle_rad / 2)
     return (E_inc**2 / m_e_c2) * factor_geometrico *  cte_mom_elec
 
@@ -476,6 +476,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
