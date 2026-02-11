@@ -515,10 +515,10 @@ class XRFDeconv:
                                    ftol=tol*2 
                                    )
             self.pcov = pcov 
-        if etapa != "bkg":
-            print(f"cte_mom_elec óptimo es {popt[-1]}")
+            
         self.p_actual = core.build_p_from_free(popt, self.p_actual, free_mask)
         opt_params = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
+        
         if etapa == "bkg":
             self.bkg_fit = core.continuum_bkg(self.E, opt_params, fondo=self.fondo, E_min=E_min, E_max=E_max)
         else:
@@ -670,6 +670,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
