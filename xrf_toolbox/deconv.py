@@ -366,7 +366,6 @@ class XRFDeconv:
             self.p_actual = self.get_p0("bkg")
 
         p0_free = self.get_p0(etapa, free_mask)
-        if etapa != "bkg": p0_free.append(0.295) # temporal
         E_min, E_max = self.E.min(), self.E.max()
 
         if etapa == "bkg":
@@ -386,11 +385,10 @@ class XRFDeconv:
                     return core.continuum_bkg(E_val, params, fondo=self.fondo)
         else:
             def frx_wrapper(E_val, *p_free):
-                print("entrando a wrapper")
                 p_full = core.build_p_from_free(p_free[:-1], self.p_actual, free_mask)
                 params = core.pack_params(p_full, self.elements, n_bkg=self.n_bkg)
                 return core.FRX_model_sdd_general(E_val, params, self.t_live, fondo=self.fondo, 
-                                                  config=self.config, E_min=E_min, E_max=E_max, cte_mom_elec=p_free[-1]) 
+                                                  config=self.config, E_min=E_min, E_max=E_max) 
 
         # BOUNDS DINÁMICOS
         # Identificamos los índices de los parámetros que SÍ son libres
@@ -400,7 +398,6 @@ class XRFDeconv:
         # Definimos el techo de cuentas: 1.5 veces el máximo del espectro
         # es más que suficiente para cualquier pico real.
         techo_cuentas = np.max(self.I) * 1.5
-        if etapa != "bkg": p0_free = p0_free[:-1]    # temporal
         for i, val in enumerate(p0_free):
             # Encontrar a qué parámetro real corresponde este p0_free[i]
             # Esto es clave para aplicar límites físicos
@@ -436,10 +433,9 @@ class XRFDeconv:
             # --- Áreas de Elementos ---
             else: # Áreas de elementos
                 lower.append(0.0); upper.append(techo_cuentas)
-        if etapa != "bkg":        # temporal
-            lower.append(0.1)
-            upper.append(0.5)
+                
         bounds = (lower, upper)
+        
         if etapa not in ["bkg", "scat", "resol"]:
             roi_mask = prc.generar_mascara_roi(self.E, self.elements, margen=roi_margin)
 
@@ -455,7 +451,6 @@ class XRFDeconv:
                                    ftol=tol
                                    )
         elif etapa == "scat" or etapa == "resol":
-            p0_free.append(0.295) # temporal
             popt, pcov = curve_fit(frx_wrapper, 
                                    self.E, 
                                    self.I,
@@ -675,6 +670,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
