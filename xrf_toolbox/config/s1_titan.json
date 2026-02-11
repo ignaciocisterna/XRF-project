@@ -19,11 +19,13 @@
         "resolution_mn_ka_ev": 145.0, 
         "dead_layer_um": 0.02 
     },
+    "voltaje_kV": 50.0,
     "window": {
         "material": "C", 
         "thickness_um": 1.0 
     }
 }
+
 
 
 
