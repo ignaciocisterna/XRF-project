@@ -48,8 +48,6 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
         "Ma2": xl.MA2_LINE,
         "Mb":  xl.MB_LINE,
         "Mg":  xl.MG_LINE,
-        "Mz1": xl.MZ1_LINE,
-        "Mz2": xl.MZ2_LINE,
     }
 
     # Mapeo de líneas a sus niveles de transición para calcular el ancho (gamma)
@@ -75,8 +73,6 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
         "Ma2": (xl.M5_SHELL, xl.N6_SHELL),
         "Mb":  (xl.M4_SHELL, xl.N6_SHELL),
         "Mg":  (xl.M3_SHELL, xl.N5_SHELL),
-        "Mz1": (xl.M5_SHELL, xl.N3_SHELL),
-        "Mz2": (xl.M4_SHELL, xl.M2_SHELL),
     }
     
     info = {}
@@ -520,6 +516,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
