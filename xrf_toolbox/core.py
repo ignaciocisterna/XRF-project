@@ -91,7 +91,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
             energy = elam_table[name][0] if name in elam_table else xl.LineEnergy(Z, line_code)
             if energy <= 0: continue
 
-            cs = xl.CS_FluorLine_Kissel(symb, line_code, E_ref)
+            cs = xl.CS_FluorLine_Kissel(Z, line_code, E_ref)
             if cs <= 0: continue
 
             try:
@@ -495,6 +495,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
