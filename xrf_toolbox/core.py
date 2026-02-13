@@ -80,20 +80,31 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     info = {}
     try:
         elam_table = xraydb.xray_lines(symb)
-    except:
-        elam_table = {}
-        print(f"Advertencia: No se pudo cargar XrayDB para {symb}")
+        ###########################Temporal############################
+        if symb == "Pb":
+        print(f"\n--- Líneas Elam detectadas para {symb} ---")
+        for k, v in elam_table.items():
+            # v[0] es la energía en eV
+            print(f"Línea: {k:6} | Energía: {v[0]/1000.0:.4f} keV")
+        ###############################################################
+        except:
+            elam_table = {}
+            print(f"Advertencia: No se pudo cargar XrayDB para {symb}")
 
     for fam in families:
         if fam not in LINE_MAPS: continue
 
         temp_family_info = {}
         for name, line_code in LINE_MAPS[fam].items():
-            
-            # --- FIX: Verificamos si existe en Elam y convertimos de eV a keV ---
+            # Intentar nombre exacto (Ma1), luego nombre corto (Ma)
+            short_name = name[:-1] if name[-1].isdigit() else name
             if name in elam_table:
                 # xraydb devuelve una tupla/objeto, la energía está en el atributo 'energy' o índice 0 (en eV)
                 energy_ev = getattr(elam_table[name], 'energy', elam_table[name][0])
+                energy = energy_ev / 1000.0  # Pasar a keV
+                source = "Elam"
+            elif short_name in elam_table:
+                energy_ev = getattr(elam_table[short_name], 'energy', elam_table[short_name][0])
                 energy = energy_ev / 1000.0  # Pasar a keV
                 source = "Elam"
             else:
@@ -510,6 +521,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
