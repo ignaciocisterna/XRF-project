@@ -1,5 +1,6 @@
 import numpy as np
 import xraylib as xl
+import xraydb
 from scipy.special import voigt_profile
 from numpy.polynomial.chebyshev import chebval
 
@@ -494,6 +495,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
