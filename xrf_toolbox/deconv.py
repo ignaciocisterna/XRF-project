@@ -87,7 +87,7 @@ class XRFDeconv:
         self.I_net = self.I - self.bkg_snip
         self.I_net[self.I_net < 0] = 0 # Limpieza de valores negativos
         if autodet:                 
-            self.elements = prc.detectar_elementos(self.E, self.I, self.bkg_snip, 
+            self.elements = prc.detectar_elementos(self.E, self.I, self.bkg_snip, self.config,
                                                    manual_elements=manual,
                                                    ignorar=ignore,
                                                    permitir_solapamientos=permitir_solapamientos, 
@@ -674,3 +674,4 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
