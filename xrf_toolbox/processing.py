@@ -65,7 +65,7 @@ def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=Non
     if not permitir_solapamientos:
         for m in manuales:
             try:
-                info_m = get_Xray_info(m, config_anode=config.anode)
+                info_m = get_Xray_info(m)
                 if "Ka1" in info_m: energias_manuales.append(info_m["Ka1"]["energy"])
                 if "La1" in info_m: energias_manuales.append(info_m["La1"]["energy"])
             except: continue
@@ -103,7 +103,7 @@ def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=Non
             
             try:
                 # 3. LLAMADA CACHEADA CON CONFIG
-                info = get_Xray_info(sym, config_anode=config.anode)
+                info = get_Xray_info(sym)
                 
                 # Evaluamos K y L por separado para aplicar la física
                 for fam, main_line in [("K", "Ka1"), ("L", "La1")]:
@@ -226,6 +226,7 @@ def estimate_tau_pileup(counts, T_real, T_live):
     tau = (T_real - T_live) / n_total
     
     return tau
+
 
 
 
