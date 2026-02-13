@@ -19,7 +19,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config_anode=None, E_ref=None)
     Z = xl.SymbolToAtomicNumber(symb)
 
     # --- Configuración de Energía de Excitación ---
-    if config and not E_ref:
+    if config_anode and not E_ref:
         Z_anode = xl.SymbolToAtomicNumber(config_anode)
         E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
     elif E_ref is None:
@@ -547,6 +547,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
