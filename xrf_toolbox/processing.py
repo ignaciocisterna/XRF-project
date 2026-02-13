@@ -130,6 +130,7 @@ def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=Non
                                     score -= 10
                             
                             candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
+                            print(sym, score)
             except: 
                 continue
         
@@ -226,6 +227,7 @@ def estimate_tau_pileup(counts, T_real, T_live):
     tau = (T_real - T_live) / n_total
     
     return tau
+
 
 
 
