@@ -105,12 +105,19 @@ def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=Non
                 # 3. LLAMADA CACHEADA CON CONFIG
                 info = get_Xray_info(sym)
                 
-                # Evaluamos K y L por separado para aplicar la física
-                for fam, main_line in [("K", "Ka1"), ("L", "La1")]:
+                # Vamos a buscar en info las líneas principales que haya devuelto get_Xray_info
+                # Sin forzar que se llamen exactamente "Ka1" o "La1"
+                for nombre_linea, datos_linea in info.items():
+                    # Solo evaluamos si es una línea principal (Ka, Ka1, La, La1)
+                    if not nombre_linea.startswith(("Ka", "La")):
+                        continue
+                    
+                    # Extraer familia para is_excitable
+                    fam = "K" if nombre_linea.startswith("K") else "L"
                     
                     # 4. BARRERA FÍSICA: ¿Puede el tubo excitar esta capa?
-                    if main_line in info and is_excitable(z, fam, config):
-                        e_theo = info[main_line]["energy"]
+                    if is_excitable(z, fam, config):
+                        e_theo = datos_linea["energy"]
                         
                         if abs(e_theo - ep) < tolerance:
                             score = 15 if sym in PRIORIDAD else 5
@@ -118,20 +125,26 @@ def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=Non
                             if sym in TIERRAS_RARAS or sym in ESCASOS:
                                 score -= 12 
                             
-                            # Validación de pareja con la estadística del fondo
-                            check_line = "Kb1" if fam == "K" else "Lb1"
-                            if check_line in info:
+                            # Validación de pareja (buscamos cualquier Kb o Lb disponible en info)
+                            parejas_posibles = [k for k in info.keys() if k.startswith(("Kb", "Lb"))]
+                            
+                            if parejas_posibles:
+                                check_line = parejas_posibles[0] # Tomamos la primera pareja disponible
                                 e_check = info[check_line]["energy"]
                                 idx_c = np.abs(E - e_check).argmin()
-                                # Verificamos si la pareja sobresale del fondo
-                                if I_net[idx_c] > 4 * std_ruido[idx_c]:
+                                
+                                # Ajuste para alto fondo EDXRF
+                                sigma_req = 2 if config.mode == "EDXRF" else 4
+                                if I_net[idx_c] > sigma_req * std_ruido[idx_c]:
                                     score += 25 
                                 else:
-                                    score -= 10
+                                    score -= (5 if config.mode == "EDXRF" else 10)
                             
                             candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
-                            print(sym, score)
-            except: 
+                            # print(f"DEBUG DETECCIÓN: {sym} | Linea: {nombre_linea} | Score: {score}")
+            except Exception as e: 
+                # Si falla algo dentro de info, imprimimos el error para saber qué es
+                print(f"Error evaluando {sym}: {e}")
                 continue
         
         if candidatos_locales:
@@ -227,6 +240,7 @@ def estimate_tau_pileup(counts, T_real, T_live):
     tau = (T_real - T_live) / n_total
     
     return tau
+
 
 
 
