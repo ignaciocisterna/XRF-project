@@ -81,7 +81,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     try:
         elam_table = xraydb.xray_lines(symb)
         ###########################Temporal#############################
-            if symb == "Pb":
+        if symb == "Pb":
             print(f"\n--- Líneas Elam detectadas para {symb} ---")
             for k, v in elam_table.items():
                 # v[0] es la energía en eV
@@ -521,6 +521,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
