@@ -9,6 +9,7 @@ import time
 import itertools
 import threading
 from numpy.polynomial.chebyshev import Chebyshev
+from functools import lru_cache
 # Importaciones relativas 
 from . import core as core
 from . import processing as prc
@@ -119,7 +120,7 @@ class XRFDeconv:
             if not core.is_excitable(xl.SymbolToAtomicNumber(elemento), familia, self.config):
                 return 0
             # 2. ¿Tiene líneas en el rango de energía actual?
-            info = core.get_Xray_info(elemento, families=(familia,), config=self.config)
+            info = core.get_Xray_info(elemento, families=(familia,), config_anode=self.config.anode)
             for line_data in info.values():
                 if e_min <= line_data['energy'] <= e_max:
                     return 1
@@ -671,6 +672,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
