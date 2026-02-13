@@ -13,41 +13,42 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
            Idealmente la energía Ka del ánodo (ej. 20.21 para Rh).
     """
     Z = xl.SymbolToAtomicNumber(symb)
-    # Si no nos dan energía de referencia, usamos una alta por defecto (50 keV)
-    # para asegurar que calculamos ratios válidos incluso si el ánodo es ligero.
-    if config:
-        if not E_ref:
-            Z_anode = xl.SymbolToAtomicNumber(config.anode)
-            E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
-    else:
-        if E_ref is None:
-            E_ref = 50.0
+
+    # --- Configuración de Energía de Excitación ---
+    if config and not E_ref:
+        Z_anode = xl.SymbolToAtomicNumber(config.anode)
+        E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
+    elif E_ref is None:
+        # Si no nos dan energía de referencia, usamos una alta por defecto (50 keV)
+        # para asegurar que calculamos ratios válidos incluso si el ánodo es ligero.
+        E_ref = 50.0
         
-    K_LINES = {
-        "Ka1": xl.KA1_LINE,
-        "Ka2": xl.KA2_LINE,
-        "Kb1": xl.KB1_LINE,
-        "Kb3": xl.KB3_LINE,
-        "Kb5": xl.KB5_LINE,
-    }
-
-    L_LINES = {
-        "La1": xl.LA1_LINE,
-        "La2": xl.LA2_LINE,
-        "Lb1": xl.LB1_LINE,
-        "Lb2": xl.LB2_LINE,
-        "Lb3": xl.LB3_LINE,
-        "Lb4": xl.LB4_LINE,
-        "Lg1": xl.LG1_LINE,
-        "Ll" : xl.LL_LINE,
-        "Le" : xl.LE_LINE,
-    }
-
-    M_LINES = {
-        "Ma1": xl.MA1_LINE,
-        "Ma2": xl.MA2_LINE,
-        "Mb":  xl.MB_LINE,
-        "Mg":  xl.MG_LINE,
+    # Diccionarios maestros de líneas 
+    LINE_MAPS = {
+        "K": {
+            "Ka1": xl.KA1_LINE, 
+            "Ka2": xl.KA2_LINE,
+            "Kb1": xl.KB1_LINE, 
+            "Kb3": xl.KB3_LINE, 
+            "Kb5": xl.KB5_LINE,
+        },
+        "L": {
+            "La1": xl.LA1_LINE, 
+            "La2": xl.LA2_LINE, 
+            "Lb1": xl.LB1_LINE,
+            "Lb2": xl.LB2_LINE, 
+            "Lb3": xl.LB3_LINE, 
+            "Lb4": xl.LB4_LINE,
+            "Lg1": xl.LG1_LINE, 
+            "Ll" : xl.LL_LINE,  
+            "Le" : xl.LE_LINE,
+        },
+        "M": {
+            "Ma1": xl.MA1_LINE, 
+            "Ma2": xl.MA2_LINE, 
+            "Mb" : xl.MB_LINE,  
+            "Mg" : xl.MG_LINE,
+        }
     }
 
     # Mapeo de líneas a sus niveles de transición para calcular el ancho (gamma)
@@ -76,64 +77,42 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     }
     
     info = {}
-
-    families_def = {
-        "K": (K_LINES, "Ka1"),
-        "L": (L_LINES, "La1"),
-        "M": (M_LINES, "Ma1"),
-    }
-
     for fam in families:
-        lines, ref_name = families_def[fam]
-
-        # 1. Obtener CS de la línea de referencia (Denominador)
-        # Usamos CS_FluorLine_Kissel que es más preciso
+        if fam not in LINE_MAPS: continue
+        
         try:
-            # Verificamos si la línea existe para ese Z
-            ref_line_id = lines[ref_name]
-            # Calculamos la sección eficaz de producción a la energía de referencia
-            ref_cs = xl.CS_FluorLine_Kissel(Z, ref_line_id, E_ref)
-        except ValueError:
-            continue
+            elam_table = xraydb.xray_lines(symb, fam)
+        except:
+            elam_table = {}
 
-        if ref_cs <= 0:
-            # Si la energía de referencia no excita la línea, intentamos
-            # con una energía de respaldo muy alta (ej. 100 keV) solo para obtener
-            # los ratios relativos de la familia, asumiendo que el usuario
-            # filtrará la excitación real después con is_excitable.
+        temp_family_info = {}
+        for name, line_code in LINE_MAPS[fam].items():
+            energy = elam_table[name][0] if name in elam_table else xl.LineEnergy(Z, line_code)
+            if energy <= 0: continue
+
+            cs = xl.CS_Production_CP(symb, line_code, E_ref)
+            if cs <= 0: continue
+
             try:
-                ref_cs = xl.CS_FluorLine_Kissel(Z, ref_line_id, 100.0)
-            except ValueError:
-                continue
-            if ref_cs <= 0: continue
+                l1, l2 = LINE_LEVELS[name]
+                gamma = (xl.AtomicLevelWidth(Z, l1) + xl.AtomicLevelWidth(Z, l2)) / 2
+            except:
+                gamma = 0.001
 
-        for name, line_id in lines.items():
-            try:
-                energy = xl.LineEnergy(Z, line_id)
-                
-                # 2. Calcular CS de la línea actual (Numerador)
-                # Usamos la misma energía E_ref para ser consistentes
-                cs = xl.CS_FluorLine_Kissel(Z, line_id, E_ref)
-                
-                # Fallback si E_ref era muy baja (mismo truco de arriba)
-                if cs <= 0:
-                    cs = xl.CS_FluorLine_Kissel(Z, line_id, 100.0)
+            temp_family_info[name] = {
+                "energy": energy, 
+                "ratio": cs, 
+                "gamma": gamma, 
+                "family": fam, 
+                "source": "Elam" if name in elam_table else "XrayLib"
+            }
 
-                if energy > 0 and cs > 0:
-                    # --- CÁLCULO DE GAMMA ---
-                    lvl_init, lvl_final = LINE_LEVELS[name]
-                    gamma_total_keV = (xl.AtomicLevelWidth(Z, lvl_init) + 
-                                       xl.AtomicLevelWidth(Z, lvl_final))
-                    gamma_hwhm = gamma_total_keV / 2.0
-                    
-                    info[name] = {
-                        "energy": energy,
-                        "ratio": cs / ref_cs, # AHORA SÍ: Ratio físico real
-                        "gamma": gamma_hwhm
-                    }
-
-            except ValueError:
-                pass
+        # --- NORMALIZACIÓN POR FAMILIA ---
+        if temp_family_info:
+            max_cs = max(d['intensity'] for d in temp_family_info.values())
+            for name in temp_family_info:
+                temp_family_info[name]['ratio'] /= max_cs
+            info.update(temp_family_info)
 
     if not info:
         raise ValueError(f"No valid X-ray lines found for {symb}")
@@ -240,7 +219,7 @@ def get_escape_ratio(E0):
     return max(0, ratio)
 
 # Modificador de peak para añadir peak de escape y suma
-def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, live_time, config):
+def add_detector_artifacts(E, spectrum, area, E0, gamma, params, live_time, config, doppler_width=0.0):
     """
     Agrega picos de Escape y Suma a un espectro a partir de un pico principal.
     
@@ -255,7 +234,9 @@ def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, live_tim
         E_esc = E0 - xl.LineEnergy(14, xl.KA1_LINE)  # Energía desplazada por el escape del Si
         # Recalculamos la resolución para la nueva energía
         s_esc = sigma_E(E_esc, params["noise"], params["fano"], params["epsilon"])
-        spectrum += voigt_peak(E, area * ratio_esc, E_esc, s_esc, gamma)
+        # La sigma total hereda la varianza Doppler del padre (si la hay)
+        s_esc_total = np.sqrt(s_esc**2 + doppler_width**2)
+        spectrum += voigt_peak(E, area * ratio_esc, E_esc, s_esc_total, gamma)
 
     # 2. PICO DE SUMA (Pile-up: E0 + E0)
     # Obtenemos tau del diccionario de parámetros
@@ -266,13 +247,14 @@ def add_detector_artifacts(E, spectrum, area, E0, sigma, gamma, params, live_tim
         prob_sum = (area / live_time) * tau
         E_sum = E0 * 2
         s_sum = sigma_E(E_sum, params["noise"], params["fano"], params["epsilon"])
+        # En la suma, la varianza Doppler se suma (Doppler1 + Doppler2) -> factor sqrt(2)
+        s_sum_total = np.sqrt(s_sum**2 + 2 * (doppler_width**2))
 
-        # Corrección de eficiencia: El detector es menos eficiente a E_sum que a E0
-        # Multiplicamos por (Eff_sum / Eff_original)
-        eff_corr = get_efficiency(E_sum, config) / get_efficiency(E0, config)
+       # El ancho natural (Lorentziano) se duplica en una convolución simple
+        gamma_sum = gamma * 2
         
-        # El pico de suma hereda el perfil (gamma) del pico original
-        spectrum += voigt_peak(E, area, E_sum, s_sum, gamma) * prob_sum * eff_corr
+        # Eliminamos eff_corr: el pileup ocurre con fotones que ya superaron la eficiencia
+        spectrum += voigt_peak(E, area * prob_sum, E_sum, s_sum_total, gamma_sum)
         
     return spectrum
 
@@ -297,25 +279,6 @@ def get_doppler_width(E_inc, angle_deg):
     cte_mom_elec = 0.362
     factor_geometrico = np.sin(angle_rad / 2)
     return (E_inc**2 / m_e_c2) * factor_geometrico *  cte_mom_elec
-
-# Perfil de los peaks de dispersión de Compton
-def compton_peak(E, area, E_com, E_inc, sigma_inst, angle_deg):
-    """
-    E: Vector de energías.
-    E_com: Centro del pico Compton.
-    E_inc: Energía original del fotón del ánodo.
-    sigma_inst: Resolución instrumental (sigma_E).
-    """
-    # Calcular el ensanchamiento de Doppler
-    doppler_width = get_doppler_width(E_inc, angle_deg)
-    
-    # La sigma total es la suma cuadrática de la resolución y el Doppler
-    sigma_total = np.sqrt(sigma_inst**2 + doppler_width**2)
-    
-    # Usamos una Gaussiana (o Voigt con gamma muy pequeña)
-    # El perfil Compton tiende a ser más ancho que el Rayleigh
-    return area * voigt_profile(E - E_com, sigma_total, 0.01)
-
 
 # Identificador de familias de señal
 def line_family(line_name):
@@ -388,9 +351,16 @@ def add_anode_scattering(spectrum, E, params, config):
         
         # --- RAYLEIGH (Elástico) ---
         if a_ray > 0:
+            # Calculamos el área EFECTIVA (lo que realmente "ve" el detector)
+            area_efectiva = a_ray * ratio * get_efficiency(E_tube, config)
             s_ray = sigma_E(E_tube, noise, fano, epsilon)
-            peak_R = voigt_peak(E, a_ray * ratio, E_tube, s_ray, gamma_tube) 
-            spectrum += peak_R * get_efficiency(E_tube, config)
+            
+            # Agregamos el pico principal al espectro
+            spectrum += voigt_peak(E, area_efectiva, E_tube, s_ray, gamma_tube) 
+            
+            # Generamos sus artefactos (Rayleigh no tiene Doppler, pasamos 0.0)
+            add_detector_artifacts(E, spectrum, area_efectiva, E_tube, gamma_tube, 
+                                   params, live_time, config)
             
         # --- COMPTON (Inelástico) ---
         if a_com > 0:
@@ -398,10 +368,18 @@ def add_anode_scattering(spectrum, E, params, config):
             E_com = get_compton_energy(E_tube, config.angle)
             # Verificar si el pico cae dentro del rango del espectro
             if E.min() < E_com < E.max():
+                area_efectiva = a_com * ratio * get_efficiency(E_com, config)
+                doppler_w = get_doppler_width(E_tube, config.angle)
                 s_com = sigma_E(E_com, noise, fano, epsilon)
-                # El ensanchamiento Doppler es más notable en líneas de alta energía (K)
-                peak_C = compton_peak(E, a_com * ratio, E_com, E_tube, s_com, config.angle)
-                spectrum += peak_C * get_efficiency(E_com, config)
+                s_com_total = np.sqrt(s_com**2 + doppler_w**2)
+                
+                # Agregamos el pico Compton (gamma residual muy pequeño)
+                gamma_compton = 0.01
+                spectrum += voigt_peak(E, area_efectiva, E_com, s_com_total, gamma_compton)
+                
+                # Generamos artefactos PASANDO la anchura Doppler para que la hereden
+                add_detector_artifacts(E, spectrum, area_efectiva, E_com, gamma_compton, 
+                                       params, live_time, config, doppler_width=doppler_w)
                 
     return spectrum
 
@@ -516,6 +494,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
