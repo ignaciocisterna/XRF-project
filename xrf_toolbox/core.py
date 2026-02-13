@@ -365,7 +365,7 @@ def continuum_bkg(E, params, fondo="poly", E_min=None, E_max=None):
         return np.exp(np.clip(poly, -700, 700))
 
 # Modelo Dispersión
-def add_anode_scattering(spectrum, E, params, config):
+def add_anode_scattering(spectrum, E, params, live_time, config):
     """
     Agrega los picos de dispersión (Rayleigh y Compton) del ánodo.
     Detecta automáticamente las familias K y L del material del ánodo.
@@ -477,7 +477,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E
             spectrum = add_detector_artifacts(E, spectrum, A * r, E0, gamma, params, live_time, config)
 
     # --- PICOS DE DISPERSIÓN ---
-    spectrum = add_anode_scattering(spectrum, E, params, config)
+    spectrum = add_anode_scattering(spectrum, E, params, live_time, config)
   
    # --- FONDO CONTINUO ---
     background = continuum_bkg(E, params, fondo=fondo,  E_min=E_min, E_max=E_max)
@@ -533,6 +533,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
