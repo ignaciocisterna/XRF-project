@@ -3,9 +3,12 @@ import xraylib as xl
 import xraydb
 from scipy.special import voigt_profile
 from numpy.polynomial.chebyshev import chebval
+from functools import lru_cache
 
 # Información de emisiones y probabilidades radiativas
-def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
+# maxsize=128 es más que suficiente para todos los elementos de la tabla periódica
+@lru_cache(maxsize=128)
+def get_Xray_info(symb, families=("K", "L", "M"), config_anode=None, E_ref=None):
     """
     Obtiene líneas de emisión usando Secciones Eficaces de Producción
     para corregir las proporciones entre subcapas.
@@ -17,7 +20,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
 
     # --- Configuración de Energía de Excitación ---
     if config and not E_ref:
-        Z_anode = xl.SymbolToAtomicNumber(config.anode)
+        Z_anode = xl.SymbolToAtomicNumber(config_anode)
         E_ref = xl.LineEnergy(Z_anode, xl.KA1_LINE)
     elif E_ref is None:
         # Si no nos dan energía de referencia, usamos una alta por defecto (50 keV)
@@ -90,13 +93,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     info = {}
     try:
         elam_table = xraydb.xray_lines(symb)
-        ###########################Temporal#############################
-        #if symb == "Pb":
-        #    print(f"\n--- Líneas Elam detectadas para {symb} ---")
-        #    for k, v in elam_table.items():
-        #        # v[0] es la energía en eV
-        #        print(f"Línea: {k:6} | Energía: {v[0]/1000.0:.4f} keV")
-        ################################################################
+
     except:
         elam_table = {}
         print(f"Advertencia: No se pudo cargar XrayDB para {symb}")
@@ -458,7 +455,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E
     for elem, elem_params in params["elements"].items():
 
         try:
-            info = get_Xray_info(elem, config=config)
+            info = get_Xray_info(elem, config_anode=config.anode)
         except ValueError:
             continue
 
@@ -550,6 +547,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
