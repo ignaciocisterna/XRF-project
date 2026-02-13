@@ -80,13 +80,13 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     info = {}
     try:
         elam_table = xraydb.xray_lines(symb)
-        ###########################Temporal############################
-        if symb == "Pb":
-        print(f"\n--- Líneas Elam detectadas para {symb} ---")
-        for k, v in elam_table.items():
-            # v[0] es la energía en eV
-            print(f"Línea: {k:6} | Energía: {v[0]/1000.0:.4f} keV")
-        ###############################################################
+        ###########################Temporal#############################
+            if symb == "Pb":
+            print(f"\n--- Líneas Elam detectadas para {symb} ---")
+            for k, v in elam_table.items():
+                # v[0] es la energía en eV
+                print(f"Línea: {k:6} | Energía: {v[0]/1000.0:.4f} keV")
+        ################################################################
         except:
             elam_table = {}
             print(f"Advertencia: No se pudo cargar XrayDB para {symb}")
@@ -521,6 +521,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
