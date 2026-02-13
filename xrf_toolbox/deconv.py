@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 import xraylib as xl
+import xraydb
 import matplotlib.pyplot as plt
 import time
 import itertools
@@ -670,6 +671,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
