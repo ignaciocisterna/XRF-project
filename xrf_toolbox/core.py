@@ -114,7 +114,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
 
         # --- NORMALIZACIÓN POR FAMILIA ---
         if temp_family_info:
-            max_cs = max(d['intensity'] for d in temp_family_info.values())
+            max_cs = max(d['ratio'] for d in temp_family_info.values())
             for name in temp_family_info:
                 temp_family_info[name]['ratio'] /= max_cs
             info.update(temp_family_info)
@@ -499,6 +499,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
