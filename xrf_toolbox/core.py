@@ -109,9 +109,11 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
             # Extraer alias si lo hay
             if name in ALIAS:
                 alt_name = ALIAS[name]
-            else: alt_name = None
+            else: 
+                alt_name = None
+                
+            # 1. Obtener Energía de forma segura
             if name in elam_table:
-                # xraydb devuelve una tupla/objeto, la energía está en el atributo 'energy' o índice 0 (en eV)
                 energy_ev = getattr(elam_table[name], 'energy', elam_table[name][0])
                 energy = energy_ev / 1000.0  # Pasar a keV
                 source = "Elam"
@@ -120,21 +122,36 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
                 energy = energy_ev / 1000.0  # Pasar a keV
                 source = "Elam"
             else:
-                energy = xl.LineEnergy(Z, line_code)
-                source = "XrayLib"
+                try:
+                    energy = xl.LineEnergy(Z, line_code)
+                    source = "XrayLib"
+                except ValueError:
+                    # ¡AQUÍ ESTABA EL ERROR! Elementos ligeros no tienen líneas L o M.
+                    continue 
                 
             if energy <= 0: continue
+
+            # 2. Obtener Intensidad (CS) de forma robusta con Fallback
             try:
-                # Kissel falla si E_ref < EdgeEnergy
                 cs = xl.CS_FluorLine_Kissel(Z, line_code, E_ref)
             except ValueError:
-                # Si la energía no alcanza para excitar la línea, la intensidad es 0
                 cs = 0.0
+                
+            # --- EL RESCATE VITAL (Rescatado de v1.1.5) ---
+            # Si E_ref no la excita, forzamos con 100 keV para obtener las proporciones, 
+            # asumiendo que el Bremsstrahlung del tubo hará el trabajo empírico.
+            if cs <= 0:
+                try:
+                    cs = xl.CS_FluorLine_Kissel(Z, line_code, 100.0)
+                except ValueError:
+                    pass
+                    
             if cs <= 0: continue
 
+            # 3. Calcular Gamma
             try:
                 l1, l2 = LINE_LEVELS[name]
-                gamma = (xl.AtomicLevelWidth(Z, l1) + xl.AtomicLevelWidth(Z, l2)) / 2
+                gamma = (xl.AtomicLevelWidth(Z, l1) + xl.AtomicLevelWidth(Z, l2)) / 2.0
             except:
                 gamma = 0.001
 
@@ -533,6 +550,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
