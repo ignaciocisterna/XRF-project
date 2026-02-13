@@ -120,7 +120,7 @@ class XRFDeconv:
             if not core.is_excitable(xl.SymbolToAtomicNumber(elemento), familia, self.config):
                 return 0
             # 2. ¿Tiene líneas en el rango de energía actual?
-            familia_tuple = tuple(familia) if isinstance(familia, list) else (familia,
+            familia_tuple = tuple(familia) if isinstance(familia, list) else (familia,)
             info = core.get_Xray_info(elemento, families=familia_tuple, config_anode=self.config.anode)
             for line_data in info.values():
                 if e_min <= line_data['energy'] <= e_max:
@@ -673,6 +673,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
