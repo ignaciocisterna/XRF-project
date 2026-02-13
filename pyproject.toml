@@ -13,7 +13,6 @@ dependencies = [
     "pandas",
     "xraylib",
     "xraydb",
-    "functools",
 ]
 
 [tool.setuptools.packages.find]
@@ -25,6 +24,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 xrf_toolbox = ["config/*.json"]
+
 
 
 
