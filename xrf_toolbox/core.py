@@ -78,17 +78,28 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
     }
     
     info = {}
+    try:
+        elam_table = xraydb.xray_lines(symb)
+    except:
+        elam_table = {}
+        print(f"Advertencia: No se pudo cargar XrayDB para {symb}")
+
     for fam in families:
         if fam not in LINE_MAPS: continue
-        
-        try:
-            elam_table = xraydb.xray_lines(symb, fam)
-        except:
-            elam_table = {}
 
         temp_family_info = {}
         for name, line_code in LINE_MAPS[fam].items():
-            energy = elam_table[name][0] if name in elam_table else xl.LineEnergy(Z, line_code)
+            
+            # --- FIX: Verificamos si existe en Elam y convertimos de eV a keV ---
+            if name in elam_table:
+                # xraydb devuelve una tupla/objeto, la energía está en el atributo 'energy' o índice 0 (en eV)
+                energy_ev = getattr(elam_table[name], 'energy', elam_table[name][0])
+                energy = energy_ev / 1000.0  # Pasar a keV
+                source = "Elam"
+            else:
+                energy = xl.LineEnergy(Z, line_code)
+                source = "XrayLib"
+                
             if energy <= 0: continue
             try:
                 # Kissel falla si E_ref < EdgeEnergy
@@ -109,7 +120,7 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
                 "ratio": cs, 
                 "gamma": gamma, 
                 "family": fam, 
-                "source": "Elam" if name in elam_table else "XrayLib"
+                "source": source
             }
 
         # --- NORMALIZACIÓN POR FAMILIA ---
@@ -499,6 +510,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
