@@ -627,7 +627,7 @@ class XRFDeconv:
         # El diccionario final empaquetado
         self.p_dict = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
-        print(get_Xray_info.cache_info())
+        print(core.get_Xray_info.cache_info())
 
 #------------------------------------------------------------------------------#
 
@@ -674,101 +674,3 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
