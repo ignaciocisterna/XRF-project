@@ -272,7 +272,6 @@ def add_detector_artifacts(E, spectrum, area, E0, gamma, params, live_time, conf
     if ratio_esc > 0:
         E_esc = E0 - xl.LineEnergy(14, xl.KA1_LINE)  # Energía desplazada por el escape del Si
         # Recalculamos la resolución para la nueva energía
-        print(f"DEBUG: params type is {type(params)}, value: {params}")
         s_esc = sigma_E(E_esc, params["noise"], params["fano"], params["epsilon"])
         # La sigma total hereda la varianza Doppler del padre (si la hay)
         s_esc_total = np.sqrt(s_esc**2 + doppler_width**2)
@@ -475,7 +474,7 @@ def FRX_model_sdd_general(E_raw, params, live_time, fondo="poly", config=None, E
 
             # 2. Artefactos: Escape y Suma
             # Nota: Pasamos el área para que la función maneje los satélites
-            spectrum = add_detector_artifacts(E, spectrum, A * r, E0, sigma, gamma, params, live_time, config)
+            spectrum = add_detector_artifacts(E, spectrum, A * r, E0, gamma, params, live_time, config)
 
     # --- PICOS DE DISPERSIÓN ---
     spectrum = add_anode_scattering(spectrum, E, params, config)
@@ -534,6 +533,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
