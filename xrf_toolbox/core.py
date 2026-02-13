@@ -79,12 +79,12 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
 
     # Diccionario de traducción: { Nombre_XrayLib : [Posibles_Nombres_Elam] }
     ALIAS = {
-        "Le": ["Ln"],
-        "Lb2": ["Lb2,15"],
-        "Ma1": ["Ma"],
-        "Ma2": ["Ma"],
-        #"Mb": ["Mb"], # Por si acaso
-        #"Mg": ["Mg"]
+        "Le": "Ln",
+        "Lb2": "Lb2,15",
+        "Ma1": "Ma",
+        "Ma2": "Ma",
+        #"Mb": "Mb", # Por si acaso
+        #"Mg": "Mg"
     }
     
     info = {}
@@ -533,6 +533,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
