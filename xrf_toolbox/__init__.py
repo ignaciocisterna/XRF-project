@@ -14,12 +14,13 @@ from .metrics import exportar_reporte_pdf
 
 
 # Versión del paquete 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 # Controlar qué se importa con "from xrf_toolbox import *"
 __all__ = ["XRFDeconv", "recortar_espectro", "get_Xray_info", "detectar_elementos",
             "graficar_deteccion_preliminar", "graficar_ajuste", "generar_reporte_completo",
             "exportar_reporte_pdf"]
+
 
 
 
