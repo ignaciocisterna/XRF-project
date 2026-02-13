@@ -566,7 +566,7 @@ class XRFDeconv:
 
 #------------------------------------------------------------------------------#
 
-    def run_full_fit(self, graf=False, roi_margin=0.4, tol=1e-6):
+    def run_full_fit(self, graf=False, roi_margin=0.4, tol=5e-4):
         """Ejecuta el pipeline completo de ajuste secuencial según el modo del instrumento."""
         mode = getattr(self.config, 'mode', 'EDXRF') # Default a EDXRF por seguridad
         
@@ -627,6 +627,7 @@ class XRFDeconv:
         # El diccionario final empaquetado
         self.p_dict = core.pack_params(self.p_actual, self.elements, n_bkg=self.n_bkg)
         print(f"[{self.name}] Deconvolución finalizada con éxito.")
+        print(_get_Xray_info_cached.cache_info())
 
 #------------------------------------------------------------------------------#
 
@@ -673,6 +674,7 @@ class XRFDeconv:
                 
         df = pd.DataFrame(res).fillna("-")
         return df
+
 
 
 
