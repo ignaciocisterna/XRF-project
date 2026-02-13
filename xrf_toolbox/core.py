@@ -349,9 +349,15 @@ def is_excitable(Z, family, config):
     Chequea si el ánodo del equipo puede excitar una familia específica.
     Usa la línea Ka1 del ánodo como referencia de energía de excitación.
     """
-    # 1. Obtener energía de la línea Ka1 del ánodo
-    Z_anode = xl.SymbolToAtomicNumber(config.anode)
-    E_excit = xl.LineEnergy(Z_anode, xl.KA1_LINE)
+     # 1. Obtener energía de la línea Ka1 del ánodo
+    if config.mode in ["EDXRF"]: # después pueden añadirse más modos donde la excitación por Bremsstrahlung sea importante
+        # Intentamos obtener el voltaje del config, si no, 
+        # usamos un valor alto por defecto 
+        E_excit = getattr(config, 'voltaje_kV', 45.0)
+    else: 
+        # Modo TXRF: sigue mandando el ánodo
+        Z_anode = xl.SymbolToAtomicNumber(config.anode)
+        E_excit = xl.LineEnergy(Z_anode, xl.KA1_LINE)
     
     # 2. Mapeo de bordes de absorción principales
     SHELLS = {"K": xl.K_SHELL, "L": xl.L3_SHELL, "M": xl.M5_SHELL}
@@ -547,6 +553,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
