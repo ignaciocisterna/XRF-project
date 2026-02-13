@@ -44,54 +44,53 @@ def snip_trace_safe(
     background = np.exp(y_final) - c
     return np.clip(background, 0, None)
 
-def detectar_elementos(E, I, bkg_snip, manual_elements=None, ignorar=None, tolerance=0.05, sigma_umbral=8, 
+def detectar_elementos(E, I, bkg_snip, config, manual_elements=None, ignorar=None, tolerance=0.05, sigma_umbral=8, 
                        permitir_solapamientos=False, todos=False):
     """
-    Autodetección robusta basada en significancia estadística y probabilidad.
+    Autodetección robusta: Basada en significancia estadística, probabilidad 
+    y restricciones físicas del tubo de rayos X.
     """
     I_net = I - bkg_snip
     max_counts = np.max(I_net)
-    # Calculamos la desviación estándar del ruido basada en el fondo (Poisson)
-    # Un pico es real si supera el fondo en N sigmas.
     std_ruido = np.sqrt(np.maximum(bkg_snip, 1))
     
-    # Buscamos picos que destaquen sobre el ruido local
     indices, _ = find_peaks(I_net, height=sigma_umbral * std_ruido, distance=15, prominence=max_counts * 0.005)
     energias_picos = E[indices]
 
-    # 1. Inclusión de elementos manuales
     manuales = set(manual_elements) if manual_elements else set()
     elementos_finales = manuales.copy()
 
-    # Pre-calculo de energías de manuales para control de solapamiento
+    # 1. Pre-calculo seguro de manuales usando la nueva caché
     energias_manuales = []
     if not permitir_solapamientos:
         for m in manuales:
             try:
-                info_m = get_Xray_info(m)
+                info_m = get_Xray_info(m, config_anode=config.anode)
                 if "Ka1" in info_m: energias_manuales.append(info_m["Ka1"]["energy"])
                 if "La1" in info_m: energias_manuales.append(info_m["La1"]["energy"])
             except: continue
 
     # Grupos de control
-    PRIORIDAD = {'Si', 'Ar', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Sb', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn'}
+    PRIORIDAD = {'Si', 'Ar', 'Ti', 'Fe', 'Cu', 'Zn', 'As', 'Se', 'Sr', 'Sb', 'Pb', 'Ca', 'K', 'Cl', 'S', 'Ni', 'Cr', 'Mn', 'Sn'} # Añadí Sn por el EDXRF
     TIERRAS_RARAS = {'La', 'Ce', 'Pr', 'Nd', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu'}
     ESCASOS = {'Os', 'Ir', 'Re', 'Ru', 'Rh', 'Pd', 'Pt', 'Au', 'Hf', 'Ta'}
-    if not todos:
-        EXCLUIR = {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Kr', 'Xe'}
-    else:
-        EXCLUIR = {}
-
+    
+    EXCLUIR = {} if todos else {'Tc', 'Pm', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Pa', 'Np', 'Pu', 'Kr', 'Xe'}
     if ignorar:
         EXCLUIR.update(ignorar)
     
-    zona_exclusion = (16.8, 17.8) # Zona del Mo/Dispersión
+    # 2. ZONA DE EXCLUSIÓN DINÁMICA (Basada en el ánodo)
+    Z_anode = xl.SymbolToAtomicNumber(config.anode)
+    E_anode_Ka = xl.LineEnergy(Z_anode, xl.KA1_LINE)
+    E_anode_Kb = xl.LineEnergy(Z_anode, xl.KB1_LINE)
+    # Excluimos la franja donde dominan Rayleigh y Compton (ej. 1.5 keV abajo del Ka y 0.5 arriba del Kb)
+    zona_exclusion = (E_anode_Ka - 1.5, E_anode_Kb + 0.5)
 
     for ep in energias_picos:
-        # Filtros básicos de energía
-        if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0: continue
+        # Filtros básicos de energía y exclusión del ánodo
+        if (zona_exclusion[0] < ep < zona_exclusion[1]) or ep < 1.0: 
+            continue
 
-        # Protección de manuales: si el pico es "propiedad" de un manual, saltar
         if not permitir_solapamientos and any(abs(ep - em) < tolerance for em in energias_manuales):
             continue
 
@@ -99,35 +98,40 @@ def detectar_elementos(E, I, bkg_snip, manual_elements=None, ignorar=None, toler
         for z in range(11, 84):
             sym = xl.AtomicNumberToSymbol(z)
             
-            # Si el elemento ya está en manuales, no lo buscamos de nuevo como auto-detectado
-            if sym in elementos_finales and not permitir_solapamientos:
+            if (sym in elementos_finales and not permitir_solapamientos) or sym in EXCLUIR:
                 continue
-            if sym in EXCLUIR: continue
             
             try:
-                info = get_Xray_info(sym)
-                for fam in ["Ka1", "La1"]:
-                    if fam in info:
-                        e_theo = info[fam]["energy"]
+                # 3. LLAMADA CACHEADA CON CONFIG
+                info = get_Xray_info(sym, config_anode=config.anode)
+                
+                # Evaluamos K y L por separado para aplicar la física
+                for fam, main_line in [("K", "Ka1"), ("L", "La1")]:
+                    
+                    # 4. BARRERA FÍSICA: ¿Puede el tubo excitar esta capa?
+                    if main_line in info and is_excitable(z, fam, config):
+                        e_theo = info[main_line]["energy"]
+                        
                         if abs(e_theo - ep) < tolerance:
                             score = 15 if sym in PRIORIDAD else 5
                             
-                            # Penalización de tierras raras
                             if sym in TIERRAS_RARAS or sym in ESCASOS:
                                 score -= 12 
                             
-                            # Validación de pareja (Kb o Lb)
-                            check_line = "Kb1" if fam == "Ka1" else "Lb1"
+                            # Validación de pareja con la estadística del fondo
+                            check_line = "Kb1" if fam == "K" else "Lb1"
                             if check_line in info:
                                 e_check = info[check_line]["energy"]
                                 idx_c = np.abs(E - e_check).argmin()
+                                # Verificamos si la pareja sobresale del fondo
                                 if I_net[idx_c] > 4 * std_ruido[idx_c]:
                                     score += 25 
                                 else:
                                     score -= 10
                             
                             candidatos_locales.append({'sym': sym, 'score': score, 'diff': abs(e_theo - ep)})
-            except: continue
+            except: 
+                continue
         
         if candidatos_locales:
             mejor = max(candidatos_locales, key=lambda x: (x['score'], -x['diff']))
@@ -222,6 +226,7 @@ def estimate_tau_pileup(counts, T_real, T_live):
     tau = (T_real - T_live) / n_total
     
     return tau
+
 
 
 
