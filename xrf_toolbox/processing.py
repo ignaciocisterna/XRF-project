@@ -2,7 +2,7 @@ import numpy as np
 import xraylib as xl
 from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter1d
-from .core import fwhm_SNIP, get_Xray_info
+from .core import fwhm_SNIP, get_Xray_info, is_excitable
 
 # Estimación del fondo por algoritmo SNIP
 def snip_trace_safe(
@@ -240,6 +240,7 @@ def estimate_tau_pileup(counts, T_real, T_live):
     tau = (T_real - T_live) / n_total
     
     return tau
+
 
 
 
