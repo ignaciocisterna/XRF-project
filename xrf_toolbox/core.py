@@ -76,6 +76,16 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
         "Mb":  (xl.M4_SHELL, xl.N6_SHELL),
         "Mg":  (xl.M3_SHELL, xl.N5_SHELL),
     }
+
+    # Diccionario de traducción: { Nombre_XrayLib : [Posibles_Nombres_Elam] }
+    ALIAS = {
+        "Le": ["Ln"],
+        "Lb2": ["Lb2,15"],
+        "Ma1": ["Ma"],
+        "Ma2": ["Ma"],
+        #"Mb": ["Mb"], # Por si acaso
+        #"Mg": ["Mg"]
+    }
     
     info = {}
     try:
@@ -96,15 +106,17 @@ def get_Xray_info(symb, families=("K", "L", "M"), config=None, E_ref=None):
 
         temp_family_info = {}
         for name, line_code in LINE_MAPS[fam].items():
-            # Intentar nombre exacto (Ma1), luego nombre corto (Ma)
-            short_name = name[:-1] if name[-1].isdigit() else name
+            # Extraer alias si lo hay
+            if name in ALIAS:
+                alt_name = ALIAS[name]
+            else: alt_name = None
             if name in elam_table:
                 # xraydb devuelve una tupla/objeto, la energía está en el atributo 'energy' o índice 0 (en eV)
                 energy_ev = getattr(elam_table[name], 'energy', elam_table[name][0])
                 energy = energy_ev / 1000.0  # Pasar a keV
                 source = "Elam"
-            elif short_name in elam_table:
-                energy_ev = getattr(elam_table[short_name], 'energy', elam_table[short_name][0])
+            elif alt_name in elam_table:
+                energy_ev = getattr(elam_table[alt_name], 'energy', elam_table[alt_name][0])
                 energy = energy_ev / 1000.0  # Pasar a keV
                 source = "Elam"
             else:
@@ -521,6 +533,7 @@ def build_p_from_free(p_free, p_fixed, free_mask):
         else:
             p[i] = p_fixed[i]
     return p
+
 
 
 
